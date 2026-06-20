@@ -11,11 +11,9 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-    # Step 1: Check out the repository code
     - name: Checkout code
       uses: actions/checkout@v4
 
-    # Step 2: Set up Java JDK 17
     - name: Set up JDK 17
       uses: actions/setup-java@v4
       with:
@@ -23,22 +21,31 @@ jobs:
         distribution: 'zulu'
         cache: gradle
 
-    # Step 3: Explicitly set the SDK path for pre-installed Android SDK on Ubuntu
     - name: Set Android SDK Environment Variable
       run: |
         echo "ANDROID_HOME=$ANDROID_SDK_ROOT" >> $GITHUB_ENV
 
-    # Step 4: Fix script execution permissions
-    - name: Grant execute permission for gradlew
-      run: chmod +x gradlew
+    # Dynamically find where gradlew actually lives and step into its directory
+    - name: Locate and Build Project
+      run: |
+        GRADLE_PATH=$(find . -name gradlew -print -quit)
+        if [ -z "$GRADLE_PATH" ]; then
+          echo "ERROR: Could not find gradlew file anywhere in the repository!"
+          exit 1
+        fi
+        
+        # Get the directory containing gradlew
+        PROJECT_DIR=$(dirname "$GRADLE_PATH")
+        echo "Found gradlew in: $PROJECT_DIR"
+        
+        # Move into that directory, fix permissions, and run the build
+        cd "$PROJECT_DIR"
+        chmod +x gradlew
+        ./gradlew assembleDebug
 
-    # Step 5: Build the debug APK
-    - name: Build with Gradle
-      run: ./gradlew assembleDebug
-
-    # Step 6: Upload the generated APK
+    # Finds the output APK dynamically even if nested
     - name: Upload APK Artifact
       uses: actions/upload-artifact@v4
       with:
         name: Kargathra-v0.1.0-Debug
-        path: app/build/outputs/apk/debug/app-debug.apk
+        path: "**/build/outputs/apk/debug/app-debug.apk"
