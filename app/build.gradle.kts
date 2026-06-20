@@ -59,7 +59,7 @@ dependencies {
     implementation("androidx.navigation:navigation-compose:2.8.5")
 
     // Health Connect (stable)
-    implementation("androidx.health.connect:connect-client:1.0.0-rc01")
+    implementation("androidx.health.connect:connect-client:1.1.0")
 
     // Room — local persistence for logged sets
     implementation("androidx.room:room-runtime:2.6.1")
