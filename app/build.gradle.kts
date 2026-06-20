@@ -6,7 +6,7 @@ plugins {
 }
 
 android {
-    namespace = "com.kargathra.fitness"h
+    namespace = "com.kargathra.fitness"
     compileSdk = 35
 
     defaultConfig {
