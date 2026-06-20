@@ -1,0 +1,10 @@
+<resources xmlns:tools="http://schemas.android.com/tools">
+    <!-- Base XML theme. Compose drives the real UI; this only styles the
+         window before the first frame so there is no white flash. -->
+    <style name="Theme.Kargathra.Splash" parent="android:Theme.Material.NoActionBar">
+        <item name="android:windowBackground">@color/navy_900</item>
+        <item name="android:statusBarColor">@color/navy_900</item>
+        <item name="android:navigationBarColor">@color/navy_900</item>
+        <item name="android:windowLightStatusBar">false</item>
+    </style>
+</resources>
