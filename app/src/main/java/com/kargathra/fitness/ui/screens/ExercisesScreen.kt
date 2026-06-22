@@ -192,7 +192,7 @@ private fun ExerciseCard(ex: ExerciseEntity, onClick: () -> Unit) {
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun ExerciseDetailSheet(ex: ExerciseEntity, onDismiss: () -> Unit) {
-    val sheetState = rememberModalBottomSheetState(skipPartialExpansion = true)
+    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
 
     ModalBottomSheet(
         onDismissRequest = onDismiss,

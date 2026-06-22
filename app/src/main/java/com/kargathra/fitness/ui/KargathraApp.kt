@@ -1,6 +1,8 @@
 package com.kargathra.fitness.ui
 
+import android.content.Context
 import androidx.compose.foundation.layout.padding
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material3.*
@@ -41,7 +43,9 @@ fun KargathraApp(
 
     // Shared state
     var activeRoutine by remember { mutableStateOf<Routine>(SampleData.upperBodyDay) }
-    var apiKey        by remember { mutableStateOf("") }
+    val context       = LocalContext.current
+    val prefs         = remember { context.getSharedPreferences("kargathra", Context.MODE_PRIVATE) }
+    var apiKey        by remember { mutableStateOf(prefs.getString("exercise_api_key", "") ?: "") }
     var hasPunchBag   by remember { mutableStateOf(false) }
     var exerciseCount by remember { mutableIntStateOf(0) }
     var syncState     by remember { mutableStateOf<SyncState>(SyncState.Idle) }
@@ -146,19 +150,18 @@ fun KargathraApp(
                 SettingsScreen(
                     healthStatusText = healthStatusText,
                     apiKey           = apiKey,
-                    onApiKeyChange   = { apiKey = it },
+                    onApiKeyChange   = {
+                        apiKey = it
+                        prefs.edit().putString("exercise_api_key", it).apply()
+                    },
                     hasPunchBag      = hasPunchBag,
                     onPunchBagChange = { hasPunchBag = it },
                     exerciseCount    = exerciseCount,
                     onSyncNow        = {
                         scope.launch {
-                            // Update the client's key before syncing
-                            val freshRepo = ExerciseRepository(
-                                exerciseRepo.dao(),
-                                apiKey
-                            )
-                            freshRepo.sync { syncState = it }
-                            exerciseCount = freshRepo.count()
+                            exerciseRepo.updateApiKey(apiKey)
+                            exerciseRepo.sync { syncState = it }
+                            exerciseCount = exerciseRepo.count()
                         }
                     }
                 )

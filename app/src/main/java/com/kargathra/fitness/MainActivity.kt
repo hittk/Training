@@ -17,6 +17,7 @@ import com.kargathra.fitness.health.HealthConnectManager
 import com.kargathra.fitness.ui.KargathraApp
 import com.kargathra.fitness.ui.theme.KargathraTheme
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.launch
 
 class MainActivity : ComponentActivity() {
 

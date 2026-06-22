@@ -21,7 +21,7 @@ class ExerciseRepository(
     val dao: ExerciseDao,
     private val apiKey: String
 ) {
-    private val client = ExerciseApiClient(apiKey)
+    private var client = ExerciseApiClient(apiKey)
 
     // ── Cache management ──────────────────────────────────────────────────────
 
@@ -93,3 +93,8 @@ class ExerciseRepository(
 
     suspend fun count(): Int = dao.count()
 }
+
+    /** Update the API key used for future sync calls */
+    fun updateApiKey(key: String) {
+        client = ExerciseApiClient(key)
+    }
