@@ -4,9 +4,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material3.*
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.navigation.NavDestination.Companion.hierarchy
 import androidx.navigation.NavType
@@ -15,27 +13,47 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
+import com.kargathra.fitness.data.repo.ExerciseRepository
+import com.kargathra.fitness.data.repo.SyncState
 import com.kargathra.fitness.data.repo.WorkoutRepository
+import com.kargathra.fitness.data.model.Routine
+import com.kargathra.fitness.data.sample.SampleData
 import com.kargathra.fitness.ui.navigation.Destination
 import com.kargathra.fitness.ui.navigation.SETTINGS_ROUTE
 import com.kargathra.fitness.ui.screens.*
 import kotlinx.coroutines.launch
 
+private const val GENERATOR_ROUTE = "generator"
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun KargathraApp(
     repo: WorkoutRepository,
+    exerciseRepo: ExerciseRepository,
     healthConnected: Boolean,
     healthStatusText: String,
     onConnectHealth: () -> Unit
 ) {
-    val nav = rememberNavController()
+    val nav   = rememberNavController()
     val scope = rememberCoroutineScope()
     val backStack by nav.currentBackStackEntryAsState()
     val currentRoute = backStack?.destination?.route
 
+    // Shared state
+    var activeRoutine by remember { mutableStateOf<Routine>(SampleData.upperBodyDay) }
+    var apiKey        by remember { mutableStateOf("") }
+    var hasPunchBag   by remember { mutableStateOf(false) }
+    var exerciseCount by remember { mutableIntStateOf(0) }
+    var syncState     by remember { mutableStateOf<SyncState>(SyncState.Idle) }
+
+    // Refresh exercise count when sync state changes
+    LaunchedEffect(syncState) {
+        exerciseCount = exerciseRepo.count()
+    }
+
     val title = when {
-        currentRoute == SETTINGS_ROUTE -> "Settings"
+        currentRoute == SETTINGS_ROUTE  -> "Settings"
+        currentRoute == GENERATOR_ROUTE -> "Build my workout"
         currentRoute?.startsWith("log") == true -> "Log workout"
         else -> Destination.bottomBar.firstOrNull { it.route == currentRoute }?.label ?: "Kargathra"
     }
@@ -43,15 +61,15 @@ fun KargathraApp(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text(title, style = MaterialTheme.typography.headlineSmall) },
+                title   = { Text(title, style = MaterialTheme.typography.headlineSmall) },
                 actions = {
                     IconButton(onClick = { nav.navigate(SETTINGS_ROUTE) }) {
                         Icon(Icons.Outlined.Settings, contentDescription = "Settings")
                     }
                 },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.background,
-                    titleContentColor = MaterialTheme.colorScheme.onBackground,
+                colors  = TopAppBarDefaults.topAppBarColors(
+                    containerColor     = MaterialTheme.colorScheme.background,
+                    titleContentColor  = MaterialTheme.colorScheme.onBackground,
                     actionIconContentColor = MaterialTheme.colorScheme.primary
                 )
             )
@@ -62,20 +80,20 @@ fun KargathraApp(
                 Destination.bottomBar.forEach { d ->
                     val selected = dest?.hierarchy?.any { it.route == d.route } == true
                     NavigationBarItem(
-                        selected = selected,
-                        onClick = {
+                        selected  = selected,
+                        onClick   = {
                             nav.navigate(d.route) {
-                                popUpTo(Destination.TODAY.route) { saveState = true }
+                                popUpTo(Destination.WORKOUT.route) { saveState = true }
                                 launchSingleTop = true
-                                restoreState = true
+                                restoreState    = true
                             }
                         },
-                        icon = { Icon(d.icon, contentDescription = d.label) },
+                        icon  = { Icon(d.icon, contentDescription = d.label) },
                         label = { Text(d.label) },
                         colors = NavigationBarItemDefaults.colors(
-                            selectedIconColor = MaterialTheme.colorScheme.onPrimary,
-                            indicatorColor = MaterialTheme.colorScheme.primary,
-                            selectedTextColor = MaterialTheme.colorScheme.primary,
+                            selectedIconColor   = MaterialTheme.colorScheme.onPrimary,
+                            indicatorColor      = MaterialTheme.colorScheme.primary,
+                            selectedTextColor   = MaterialTheme.colorScheme.primary,
                             unselectedIconColor = MaterialTheme.colorScheme.onSurfaceVariant,
                             unselectedTextColor = MaterialTheme.colorScheme.onSurfaceVariant
                         )
@@ -85,37 +103,97 @@ fun KargathraApp(
         }
     ) { inner ->
         NavHost(
-            navController = nav,
-            startDestination = Destination.TODAY.route,
-            modifier = Modifier.padding(inner)
+            navController      = nav,
+            startDestination   = Destination.WORKOUT.route,
+            modifier           = Modifier.padding(inner)
         ) {
-            composable(Destination.TODAY.route) {
-                TodayScreen(
+            composable(Destination.WORKOUT.route) {
+                WorkoutScreen(
                     healthConnected = healthConnected,
                     onConnectHealth = onConnectHealth,
-                    onStart = {
+                    activeRoutine   = activeRoutine,
+                    onStart         = {
                         scope.launch {
-                            val id = repo.startWorkout("Upper Body A")
-                            nav.navigate("log/$id")
+                            val id = repo.startWorkout(activeRoutine.title)
+                            nav.navigate("log/$id/${activeRoutine.id}")
                         }
                     }
                 )
             }
-            composable(Destination.ROUTINES.route) { RoutinesScreen() }
-            composable(Destination.EXERCISES.route) { ExercisesScreen() }
+
+            composable(Destination.PROGRAMS.route) {
+                ProgramsScreen(
+                    onBuildWorkout  = { nav.navigate(GENERATOR_ROUTE) },
+                    onLoadRoutine   = { routine ->
+                        activeRoutine = routine
+                        nav.navigate(Destination.WORKOUT.route) {
+                            popUpTo(Destination.WORKOUT.route) { inclusive = true }
+                        }
+                    }
+                )
+            }
+
+            composable(Destination.EXERCISES.route) {
+                ExercisesScreen(
+                    repo        = exerciseRepo,
+                    hasPunchBag = hasPunchBag
+                )
+            }
+
             composable(Destination.PROGRESS.route) { ProgressScreen(repo) }
-            composable(SETTINGS_ROUTE) { SettingsScreen(healthStatusText) }
+
+            composable(SETTINGS_ROUTE) {
+                SettingsScreen(
+                    healthStatusText = healthStatusText,
+                    apiKey           = apiKey,
+                    onApiKeyChange   = { apiKey = it },
+                    hasPunchBag      = hasPunchBag,
+                    onPunchBagChange = { hasPunchBag = it },
+                    exerciseCount    = exerciseCount,
+                    onSyncNow        = {
+                        scope.launch {
+                            // Update the client's key before syncing
+                            val freshRepo = ExerciseRepository(
+                                exerciseRepo.dao(),
+                                apiKey
+                            )
+                            freshRepo.sync { syncState = it }
+                            exerciseCount = freshRepo.count()
+                        }
+                    }
+                )
+            }
+
+            composable(GENERATOR_ROUTE) {
+                WorkoutGeneratorScreen(
+                    onBack        = { nav.popBackStack() },
+                    onLoadRoutine = { routine ->
+                        activeRoutine = routine
+                        nav.navigate(Destination.WORKOUT.route) {
+                            popUpTo(Destination.WORKOUT.route) { inclusive = true }
+                        }
+                    }
+                )
+            }
+
             composable(
-                route = "log/{workoutId}",
-                arguments = listOf(navArgument("workoutId") { type = NavType.LongType })
+                route     = "log/{workoutId}/{routineId}",
+                arguments = listOf(
+                    navArgument("workoutId") { type = NavType.LongType },
+                    navArgument("routineId") { type = NavType.StringType }
+                )
             ) { entry ->
-                val wid = entry.arguments?.getLong("workoutId") ?: 0L
+                val wid     = entry.arguments?.getLong("workoutId") ?: 0L
+                val rid     = entry.arguments?.getString("routineId") ?: activeRoutine.id
+                val routine = if (rid == activeRoutine.id) activeRoutine
+                              else SampleData.routineById(rid) ?: activeRoutine
                 LogWorkoutScreen(
-                    repo = repo,
+                    repo      = repo,
                     workoutId = wid,
-                    onFinish = {
-                        nav.navigate(Destination.PROGRESS.route) {
-                            popUpTo(Destination.TODAY.route)
+                    routine   = routine,
+                    onFinish  = {
+                        nav.navigate(Destination.WORKOUT.route) {
+                            popUpTo(Destination.WORKOUT.route) { inclusive = false }
                             launchSingleTop = true
                         }
                     }

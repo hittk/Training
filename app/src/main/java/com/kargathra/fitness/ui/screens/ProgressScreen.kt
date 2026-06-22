@@ -14,9 +14,11 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.kargathra.fitness.data.db.ExerciseRef
+import com.kargathra.fitness.data.repo.MuscleVolume
 import com.kargathra.fitness.data.repo.TrendPoint
 import com.kargathra.fitness.data.repo.WorkoutRepository
 import com.kargathra.fitness.ui.components.KCard
+import com.kargathra.fitness.ui.components.MuscleVolumeChart
 import com.kargathra.fitness.ui.components.SectionLabel
 import com.kargathra.fitness.ui.components.TrendChart
 import java.time.Instant
@@ -25,8 +27,9 @@ import java.time.format.DateTimeFormatter
 
 @Composable
 fun ProgressScreen(repo: WorkoutRepository, modifier: Modifier = Modifier) {
-    val exercises by repo.observeLoggedExercises().collectAsStateWithLifecycle(emptyList())
-    var selected by remember { mutableStateOf<ExerciseRef?>(null) }
+    val exercises    by repo.observeLoggedExercises().collectAsStateWithLifecycle(emptyList())
+    val weeklyVolume by repo.weeklyMuscleVolume().collectAsStateWithLifecycle(emptyList())
+    var selected     by remember { mutableStateOf<ExerciseRef?>(null) }
 
     LaunchedEffect(exercises) {
         if (selected == null || exercises.none { it.exerciseId == selected!!.exerciseId }) {
@@ -40,22 +43,38 @@ fun ProgressScreen(repo: WorkoutRepository, modifier: Modifier = Modifier) {
         else repo.trendsFor(s.exerciseId).collect { value = it }
     }
 
-    if (exercises.isEmpty()) {
-        Box(modifier.fillMaxSize().padding(32.dp), contentAlignment = Alignment.Center) {
-            Text(
-                "Log a few sets and your strength trends will appear here.",
-                style = MaterialTheme.typography.bodyLarge,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                textAlign = TextAlign.Center
-            )
-        }
-        return
-    }
-
     Column(
         modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(20.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
+        // ── Weekly muscle volume ───────────────────────────────────────────────
+        if (weeklyVolume.isNotEmpty()) {
+            MuscleVolumeChart(volumes = weeklyVolume)
+        } else {
+            SectionLabel("This week — muscle volume")
+            KCard {
+                Text(
+                    "Complete a workout this week and your muscle volume breakdown will appear here.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        }
+
+        // ── Strength trends ────────────────────────────────────────────────────
+        if (exercises.isEmpty()) {
+            SectionLabel("Strength trends")
+            KCard {
+                Text(
+                    "Log a few sets and your strength trends will appear here.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    textAlign = TextAlign.Center
+                )
+            }
+            return@Column
+        }
+
         SectionLabel("Exercise")
         Row(
             Modifier.horizontalScroll(rememberScrollState()),
@@ -63,16 +82,16 @@ fun ProgressScreen(repo: WorkoutRepository, modifier: Modifier = Modifier) {
         ) {
             exercises.forEach { ex ->
                 SelectableChip(
-                    text = ex.exerciseName,
+                    text     = ex.exerciseName,
                     selected = ex.exerciseId == selected?.exerciseId,
-                    onClick = { selected = ex }
+                    onClick  = { selected = ex }
                 )
             }
         }
 
         if (trends.isEmpty()) {
             Text(
-                "No sessions yet for this exercise.",
+                "No completed sessions yet for this exercise.",
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
@@ -80,18 +99,17 @@ fun ProgressScreen(repo: WorkoutRepository, modifier: Modifier = Modifier) {
         }
 
         val latest = trends.last()
-        // Volume (reps × weight) is the headline progressive-overload signal.
         TrendChart(
-            title = "Total volume",
-            values = trends.map { it.volume.toFloat() },
+            title       = "Total volume",
+            values      = trends.map { it.volume.toFloat() },
             latestLabel = "${fmt(latest.volume)} kg",
-            footer = "${trends.size} sessions · reps × weight, summed per session"
+            footer      = "${trends.size} sessions · reps × weight, summed per session"
         )
         TrendChart(
-            title = "Estimated 1RM",
-            values = trends.map { it.estimated1Rm.toFloat() },
+            title       = "Estimated 1RM",
+            values      = trends.map { it.estimated1Rm.toFloat() },
             latestLabel = "${fmt(latest.estimated1Rm)} kg",
-            footer = "Epley estimate from your top set"
+            footer      = "Epley estimate from your top set"
         )
 
         SectionLabel("Recent sessions")
@@ -104,14 +122,12 @@ fun ProgressScreen(repo: WorkoutRepository, modifier: Modifier = Modifier) {
                 ) {
                     Text(
                         fmtDate(p.timeMillis),
-                        style = MaterialTheme.typography.titleMedium,
+                        style    = MaterialTheme.typography.titleMedium,
                         modifier = Modifier.width(96.dp)
                     )
                     Column(Modifier.weight(1f)) {
-                        Text(
-                            "Top set ${fmt(p.topWeight)} kg",
-                            style = MaterialTheme.typography.bodyMedium
-                        )
+                        Text("Top set ${fmt(p.topWeight)} kg",
+                            style = MaterialTheme.typography.bodyMedium)
                         Text(
                             "1RM ${fmt(p.estimated1Rm)} · vol ${fmt(p.volume)} kg",
                             style = MaterialTheme.typography.labelMedium,
@@ -127,16 +143,16 @@ fun ProgressScreen(repo: WorkoutRepository, modifier: Modifier = Modifier) {
 @Composable
 private fun SelectableChip(text: String, selected: Boolean, onClick: () -> Unit) {
     Surface(
-        color = if (selected) MaterialTheme.colorScheme.primary
-        else MaterialTheme.colorScheme.surfaceVariant,
-        shape = RoundedCornerShape(50),
+        color    = if (selected) MaterialTheme.colorScheme.primary
+                   else MaterialTheme.colorScheme.surfaceVariant,
+        shape    = RoundedCornerShape(50),
         modifier = Modifier.clickable(onClick = onClick)
     ) {
         Text(
-            text = text,
-            style = MaterialTheme.typography.labelLarge,
-            color = if (selected) MaterialTheme.colorScheme.onPrimary
-            else MaterialTheme.colorScheme.onSurfaceVariant,
+            text     = text,
+            style    = MaterialTheme.typography.labelLarge,
+            color    = if (selected) MaterialTheme.colorScheme.onPrimary
+                       else MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.padding(horizontal = 16.dp, vertical = 9.dp)
         )
     }

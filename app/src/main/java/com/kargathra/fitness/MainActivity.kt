@@ -17,7 +17,6 @@ import com.kargathra.fitness.health.HealthConnectManager
 import com.kargathra.fitness.ui.KargathraApp
 import com.kargathra.fitness.ui.theme.KargathraTheme
 import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.launch
 
 class MainActivity : ComponentActivity() {
 
@@ -31,11 +30,10 @@ class MainActivity : ComponentActivity() {
 
         setContent {
             KargathraTheme {
-                val status = remember { HealthConnectManager.sdkStatus(this) }
+                val status      = remember { HealthConnectManager.sdkStatus(this) }
                 val isConnected by connected.collectAsStateWithLifecycle()
-                val scope = rememberCoroutineScope()
+                val scope       = rememberCoroutineScope()
 
-                // Refresh granted-permission state when the SDK is present.
                 LaunchedEffect(Unit) {
                     if (status == HealthConnectManager.AVAILABLE) {
                         connected.value = health.hasAllPermissions()
@@ -51,10 +49,12 @@ class MainActivity : ComponentActivity() {
                 when (status) {
                     HealthConnectManager.AVAILABLE -> {
                         KargathraApp(
-                            repo = (application as App).repository,
-                            healthConnected = isConnected,
-                            healthStatusText = if (isConnected) "Connected" else "Available — not yet granted",
-                            onConnectHealth = {
+                            repo             = (application as App).repository,
+                            exerciseRepo     = (application as App).exerciseRepository,
+                            healthConnected  = isConnected,
+                            healthStatusText = if (isConnected) "Connected"
+                                              else "Available — not yet granted",
+                            onConnectHealth  = {
                                 scope.launch { permissionLauncher.launch(health.permissions) }
                             }
                         )

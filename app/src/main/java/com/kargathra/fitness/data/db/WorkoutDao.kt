@@ -25,4 +25,28 @@ interface WorkoutDao {
 
     @Query("SELECT DISTINCT exerciseId, exerciseName FROM sets ORDER BY exerciseName")
     fun observeLoggedExercises(): Flow<List<ExerciseRef>>
+
+    /**
+     * Best (heaviest) set ever logged for an exercise, from any COMPLETED workout.
+     * Used to show progressive overload suggestions on the log screen.
+     */
+    @Query("""
+        SELECT s.* FROM sets s
+        INNER JOIN workouts w ON s.workoutId = w.id
+        WHERE s.exerciseId = :exId AND w.completedAt IS NOT NULL
+        ORDER BY s.weightKg DESC, s.reps DESC
+        LIMIT 1
+    """)
+    suspend fun bestSetForExercise(exId: String): SetEntity?
+
+    /**
+     * All sets from workouts that started within a given time window.
+     * Used for the weekly muscle-group volume summary.
+     */
+    @Query("""
+        SELECT s.* FROM sets s
+        INNER JOIN workouts w ON s.workoutId = w.id
+        WHERE w.startedAt >= :fromMillis AND w.completedAt IS NOT NULL
+    """)
+    fun observeSetsFrom(fromMillis: Long): Flow<List<SetEntity>>
 }

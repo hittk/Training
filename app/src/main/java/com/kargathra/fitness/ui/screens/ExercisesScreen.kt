@@ -1,85 +1,415 @@
 package com.kargathra.fitness.ui.screens
 
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.Sync
+import androidx.compose.material.icons.outlined.FitnessCenter
 import androidx.compose.material3.*
-import androidx.compose.runtime.Composable
-import androidx.compose.foundation.Image
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import com.kargathra.fitness.data.model.Exercise
-import com.kargathra.fitness.data.sample.SampleData
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.kargathra.fitness.data.db.ExerciseEntity
+import com.kargathra.fitness.data.db.splitPipe
+import com.kargathra.fitness.data.repo.ExerciseRepository
+import com.kargathra.fitness.data.repo.SyncState
 import com.kargathra.fitness.ui.components.KCard
-import com.kargathra.fitness.ui.components.rememberAssetImage
+import com.kargathra.fitness.ui.components.SectionLabel
 import com.kargathra.fitness.ui.components.Tag
+import com.kargathra.fitness.ui.theme.Gold
+import kotlinx.coroutines.launch
 
 @Composable
-fun ExercisesScreen(modifier: Modifier = Modifier) {
-    LazyColumn(
-        modifier = modifier.fillMaxSize(),
-        contentPadding = PaddingValues(20.dp),
-        verticalArrangement = Arrangement.spacedBy(14.dp)
-    ) {
-        items(SampleData.exercises, key = { it.id }) { ex -> ExerciseCard(ex) }
+fun ExercisesScreen(
+    repo: ExerciseRepository,
+    hasPunchBag: Boolean = false,
+    modifier: Modifier = Modifier
+) {
+    val scope = rememberCoroutineScope()
+
+    var query      by remember { mutableStateOf("") }
+    var equipment  by remember { mutableStateOf("") }
+    var mechanic   by remember { mutableStateOf("") }
+    var syncState  by remember { mutableStateOf<SyncState>(SyncState.Idle) }
+    var detailEx   by remember { mutableStateOf<ExerciseEntity?>(null) }
+
+    val exercises by repo.search(
+        query          = query,
+        equipment      = equipment,
+        mechanic       = mechanic,
+        includePunchBag= hasPunchBag
+    ).collectAsStateWithLifecycle(emptyList())
+
+    val equipmentOptions by repo.equipmentList()
+        .collectAsStateWithLifecycle(emptyList())
+
+    // Trigger sync on first composition if needed
+    LaunchedEffect(Unit) {
+        if (repo.needsSync()) {
+            scope.launch {
+                repo.sync { syncState = it }
+            }
+        }
     }
-}
 
-@Composable
-private fun ExerciseCard(ex: Exercise) {
-    KCard {
-        Text(ex.name, style = MaterialTheme.typography.titleLarge)
-        Text(
-            ex.primary.display + (if (ex.secondary.isNotEmpty())
-                " · " + ex.secondary.joinToString(", ") { it.display } else ""),
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.padding(top = 2.dp)
-        )
-        // Bundled illustration (free-exercise-db, public domain). First frame
-        // shown; the second frame (end position) ships in assets for later use.
-        Spacer(Modifier.height(12.dp))
-        val illustration = rememberAssetImage("exercises/${ex.id}/0.jpg")
-        Surface(
-            modifier = Modifier
+    // Detail bottom sheet
+    detailEx?.let { ex ->
+        ExerciseDetailSheet(ex = ex, onDismiss = { detailEx = null })
+    }
+
+    Column(modifier.fillMaxSize()) {
+        // ── Search bar ─────────────────────────────────────────────────────────
+        OutlinedTextField(
+            value         = query,
+            onValueChange = { query = it },
+            placeholder   = { Text("Search exercises, muscles…") },
+            leadingIcon   = { Icon(Icons.Filled.Search, contentDescription = null) },
+            trailingIcon  = {
+                if (query.isNotEmpty()) {
+                    IconButton(onClick = { query = "" }) {
+                        Icon(Icons.Filled.Close, contentDescription = "Clear")
+                    }
+                }
+            },
+            singleLine    = true,
+            modifier      = Modifier
                 .fillMaxWidth()
-                .height(190.dp),
-            color = MaterialTheme.colorScheme.surfaceVariant,
-            shape = MaterialTheme.shapes.medium
+                .padding(horizontal = 20.dp, vertical = 12.dp)
+        )
+
+        // ── Filter chips ───────────────────────────────────────────────────────
+        Row(
+            Modifier
+                .horizontalScroll(rememberScrollState())
+                .padding(horizontal = 20.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            if (illustration != null) {
-                Image(
-                    bitmap = illustration,
-                    contentDescription = "How to perform ${ex.name}",
-                    modifier = Modifier.fillMaxSize(),
-                    contentScale = ContentScale.Fit
-                )
-            } else {
-                Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+            FilterPill("All", mechanic.isEmpty() && equipment.isEmpty()) {
+                mechanic = ""; equipment = ""
+            }
+            FilterPill("Compound", mechanic == "compound") {
+                mechanic = if (mechanic == "compound") "" else "compound"
+            }
+            FilterPill("Isolation", mechanic == "isolation") {
+                mechanic = if (mechanic == "isolation") "" else "isolation"
+            }
+            equipmentOptions.forEach { eq ->
+                FilterPill(eq.replaceFirstChar { it.uppercase() }, equipment == eq) {
+                    equipment = if (equipment == eq) "" else eq
+                }
+            }
+        }
+
+        Spacer(Modifier.height(8.dp))
+
+        // ── Sync state banner ──────────────────────────────────────────────────
+        AnimatedVisibility(visible = syncState !is SyncState.Idle && syncState !is SyncState.Done) {
+            SyncBanner(state = syncState, onRetry = {
+                scope.launch { repo.sync { syncState = it } }
+            })
+        }
+
+        // ── Exercise list ──────────────────────────────────────────────────────
+        if (exercises.isEmpty() && syncState is SyncState.Idle) {
+            EmptyState(
+                hasApiKey = true,
+                onSync    = { scope.launch { repo.sync { syncState = it } } }
+            )
+        } else {
+            val listState = rememberLazyListState()
+            LazyColumn(
+                state           = listState,
+                contentPadding  = PaddingValues(horizontal = 20.dp, vertical = 8.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp),
+                modifier        = Modifier.fillMaxSize()
+            ) {
+                item {
                     Text(
-                        "Illustration",
+                        "${exercises.size} exercises",
                         style = MaterialTheme.typography.labelMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
-            }
-        }
-        if (ex.cues.isNotEmpty()) {
-            Spacer(Modifier.height(12.dp))
-            ex.cues.forEach { cue ->
-                Row(Modifier.padding(vertical = 2.dp)) {
-                    Text("•  ", style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.primary)
-                    Text(cue, style = MaterialTheme.typography.bodyMedium)
+                items(exercises, key = { it.id }) { ex ->
+                    ExerciseCard(ex = ex, onClick = { detailEx = ex })
                 }
             }
         }
-        Spacer(Modifier.height(10.dp))
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            Tag(ex.equipment.first().display)
-            if (ex.repRange.first > 0) Tag("${ex.repRange.first}-${ex.repRange.last} reps")
+    }
+}
+
+// ── Exercise card (list item) ─────────────────────────────────────────────────
+
+@Composable
+private fun ExerciseCard(ex: ExerciseEntity, onClick: () -> Unit) {
+    KCard(modifier = Modifier.clickable(onClick = onClick)) {
+        Row(verticalAlignment = Alignment.Top) {
+            Column(Modifier.weight(1f)) {
+                Text(ex.name, style = MaterialTheme.typography.titleMedium,
+                    maxLines = 2, overflow = TextOverflow.Ellipsis)
+                val muscles = ex.primaryMuscles.splitPipe().take(2).joinToString(", ")
+                if (muscles.isNotEmpty()) {
+                    Text(
+                        muscles,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(top = 2.dp)
+                    )
+                }
+            }
+            if (ex.videoUrl.isNotEmpty()) {
+                Icon(
+                    Icons.Outlined.FitnessCenter,
+                    contentDescription = "Video available",
+                    tint     = Gold,
+                    modifier = Modifier.padding(start = 8.dp).size(18.dp)
+                )
+            }
         }
+        Spacer(Modifier.height(8.dp))
+        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            if (ex.equipment.isNotEmpty()) Tag(ex.equipment.replaceFirstChar { it.uppercase() })
+            if (ex.mechanic.isNotEmpty())  Tag(ex.mechanic.replaceFirstChar { it.uppercase() })
+            if (ex.level.isNotEmpty())     Tag(ex.level.replaceFirstChar { it.uppercase() })
+        }
+    }
+}
+
+// ── Detail bottom sheet ───────────────────────────────────────────────────────
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun ExerciseDetailSheet(ex: ExerciseEntity, onDismiss: () -> Unit) {
+    val sheetState = rememberModalBottomSheetState(skipPartialExpansion = true)
+
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        sheetState       = sheetState,
+        containerColor   = MaterialTheme.colorScheme.surface
+    ) {
+        LazyColumn(
+            contentPadding = PaddingValues(horizontal = 24.dp, vertical = 16.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp),
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            item {
+                Text(ex.name, style = MaterialTheme.typography.headlineSmall)
+                Spacer(Modifier.height(6.dp))
+                Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    if (ex.equipment.isNotEmpty()) Tag(ex.equipment.replaceFirstChar { it.uppercase() })
+                    if (ex.mechanic.isNotEmpty())  Tag(ex.mechanic.replaceFirstChar { it.uppercase() })
+                    if (ex.level.isNotEmpty())     Tag(ex.level.replaceFirstChar { it.uppercase() })
+                }
+            }
+
+            if (ex.overview.isNotEmpty()) {
+                item {
+                    SectionLabel("Overview")
+                    Text(ex.overview, style = MaterialTheme.typography.bodyMedium)
+                }
+            }
+
+            val primary = ex.primaryMuscles.splitPipe()
+            val secondary = ex.secondaryMuscles.splitPipe()
+            if (primary.isNotEmpty()) {
+                item {
+                    SectionLabel("Muscles")
+                    Text("Primary: ${primary.joinToString(", ")}",
+                        style = MaterialTheme.typography.bodyMedium)
+                    if (secondary.isNotEmpty()) {
+                        Text(
+                            "Secondary: ${secondary.joinToString(", ")}",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.padding(top = 4.dp)
+                        )
+                    }
+                }
+            }
+
+            val instructions = ex.instructions.splitPipe()
+            if (instructions.isNotEmpty()) {
+                item {
+                    SectionLabel("How to perform")
+                    instructions.forEachIndexed { i, step ->
+                        Row(Modifier.padding(vertical = 3.dp)) {
+                            Text(
+                                "${i + 1}.",
+                                style    = MaterialTheme.typography.bodyMedium,
+                                color    = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.width(24.dp)
+                            )
+                            Text(step, style = MaterialTheme.typography.bodyMedium)
+                        }
+                    }
+                }
+            }
+
+            val tips = ex.exerciseTips.splitPipe()
+            if (tips.isNotEmpty()) {
+                item {
+                    SectionLabel("Tips")
+                    tips.forEach { tip ->
+                        Row(Modifier.padding(vertical = 2.dp)) {
+                            Text("✓  ", style = MaterialTheme.typography.bodyMedium,
+                                color = Gold)
+                            Text(tip, style = MaterialTheme.typography.bodyMedium)
+                        }
+                    }
+                }
+            }
+
+            val mistakes = ex.commonMistakes.splitPipe()
+            if (mistakes.isNotEmpty()) {
+                item {
+                    SectionLabel("Common mistakes")
+                    mistakes.forEach { mistake ->
+                        Row(Modifier.padding(vertical = 2.dp)) {
+                            Text("✗  ", style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.error)
+                            Text(mistake, style = MaterialTheme.typography.bodyMedium)
+                        }
+                    }
+                }
+            }
+
+            if (ex.safetyInfo.isNotEmpty()) {
+                item {
+                    SectionLabel("Safety")
+                    KCard {
+                        Text(ex.safetyInfo, style = MaterialTheme.typography.bodyMedium)
+                    }
+                }
+            }
+
+            val variations = ex.variations.splitPipe()
+            if (variations.isNotEmpty()) {
+                item {
+                    SectionLabel("Variations")
+                    Row(
+                        Modifier.horizontalScroll(rememberScrollState()),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        variations.forEach { Tag(it) }
+                    }
+                }
+            }
+
+            item { Spacer(Modifier.height(32.dp)) }
+        }
+    }
+}
+
+// ── Sync state banner ─────────────────────────────────────────────────────────
+
+@Composable
+private fun SyncBanner(state: SyncState, onRetry: () -> Unit) {
+    Surface(
+        color    = MaterialTheme.colorScheme.primaryContainer,
+        modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 4.dp)
+    ) {
+        Row(
+            Modifier.padding(12.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            when (state) {
+                is SyncState.Syncing -> {
+                    CircularProgressIndicator(
+                        modifier    = Modifier.size(16.dp),
+                        strokeWidth = 2.dp,
+                        color       = MaterialTheme.colorScheme.onPrimaryContainer
+                    )
+                    Spacer(Modifier.width(10.dp))
+                    Text(
+                        "Syncing exercises… batch ${state.batchDone}/${state.batchTotal}" +
+                                " (${state.exerciseCount} so far)",
+                        style    = MaterialTheme.typography.bodyMedium,
+                        color    = MaterialTheme.colorScheme.onPrimaryContainer
+                    )
+                }
+                is SyncState.Error -> {
+                    Text(
+                        "Sync failed: ${state.message}",
+                        style    = MaterialTheme.typography.bodyMedium,
+                        color    = MaterialTheme.colorScheme.error,
+                        modifier = Modifier.weight(1f)
+                    )
+                    TextButton(onClick = onRetry) { Text("Retry") }
+                }
+                is SyncState.RateLimited -> {
+                    Icon(Icons.Filled.Sync, contentDescription = null,
+                        tint = MaterialTheme.colorScheme.onPrimaryContainer)
+                    Spacer(Modifier.width(10.dp))
+                    Text(
+                        "Rate limited — sync will resume in a few minutes",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onPrimaryContainer
+                    )
+                }
+                else -> {}
+            }
+        }
+    }
+}
+
+// ── Empty state ───────────────────────────────────────────────────────────────
+
+@Composable
+private fun EmptyState(hasApiKey: Boolean, onSync: () -> Unit) {
+    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            modifier = Modifier.padding(32.dp)
+        ) {
+            Icon(
+                Icons.Outlined.FitnessCenter,
+                contentDescription = null,
+                tint     = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.size(48.dp)
+            )
+            Spacer(Modifier.height(16.dp))
+            Text(
+                if (hasApiKey) "Exercise library not synced yet"
+                else "Add your exerciseapi.dev key in Settings to load the exercise library",
+                style     = MaterialTheme.typography.bodyLarge,
+                color     = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            if (hasApiKey) {
+                Spacer(Modifier.height(16.dp))
+                Button(onClick = onSync) { Text("Sync now") }
+            }
+        }
+    }
+}
+
+// ── Filter pill ───────────────────────────────────────────────────────────────
+
+@Composable
+private fun FilterPill(label: String, selected: Boolean, onClick: () -> Unit) {
+    Surface(
+        color    = if (selected) MaterialTheme.colorScheme.primary
+                   else MaterialTheme.colorScheme.surfaceVariant,
+        shape    = RoundedCornerShape(50),
+        modifier = Modifier.clickable(onClick = onClick)
+    ) {
+        Text(
+            text     = label,
+            style    = MaterialTheme.typography.labelLarge,
+            color    = if (selected) MaterialTheme.colorScheme.onPrimary
+                       else MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp)
+        )
     }
 }

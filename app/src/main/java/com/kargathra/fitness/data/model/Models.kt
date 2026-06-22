@@ -1,11 +1,5 @@
 package com.kargathra.fitness.data.model
 
-// ---------------------------------------------------------------------------
-// Domain model. Kept deliberately small for the foundation; the routine
-// generator, progression logic and Health Connect mapping all build on these.
-// ---------------------------------------------------------------------------
-
-/** Equipment the user actually owns. The generator and filters key off this. */
 enum class Equipment(val display: String) {
     BARBELL("Barbell"),
     DUMBBELL("Dumbbells"),
@@ -19,7 +13,6 @@ enum class Equipment(val display: String) {
     BODYWEIGHT("Bodyweight")
 }
 
-/** Primary trainable regions used for "focus on this area" routing. */
 enum class MuscleGroup(val display: String) {
     CHEST("Chest"),
     UPPER_BACK("Upper back"),
@@ -37,9 +30,10 @@ enum class MuscleGroup(val display: String) {
 
 enum class Mechanic { COMPOUND, ISOLATION, CONDITIONING }
 
-/** Coarse movement category — lets the generator balance a session. */
-enum class Pattern { HORIZONTAL_PUSH, VERTICAL_PUSH, HORIZONTAL_PULL, VERTICAL_PULL,
-    SQUAT, HINGE, LUNGE, CURL, EXTENSION, CORE, CARDIO }
+enum class Pattern {
+    HORIZONTAL_PUSH, VERTICAL_PUSH, HORIZONTAL_PULL, VERTICAL_PULL,
+    SQUAT, HINGE, LUNGE, CURL, EXTENSION, CORE, CARDIO
+}
 
 data class Exercise(
     val id: String,
@@ -49,15 +43,11 @@ data class Exercise(
     val equipment: List<Equipment>,
     val mechanic: Mechanic,
     val pattern: Pattern,
-    /** Default working rep range for a hypertrophy emphasis. */
     val repRange: IntRange = 8..12,
-    /** Short, plain-language cues for good form. */
     val cues: List<String> = emptyList(),
-    /** Slug used to resolve an illustration from the bundled DB later. */
     val illustrationKey: String? = null
 )
 
-/** A planned movement inside a routine (target sets/reps), before logging. */
 data class RoutineItem(
     val exercise: Exercise,
     val sets: Int,
@@ -70,10 +60,11 @@ data class Routine(
     val title: String,
     val focus: List<MuscleGroup>,
     val items: List<RoutineItem>,
-    val estimatedMinutes: Int
+    val estimatedMinutes: Int,
+    /** True for AI-generated routines shown in the AI result flow */
+    val isGenerated: Boolean = false
 )
 
-/** A multi-day structured plan the user can pick from (presets). */
 data class Program(
     val id: String,
     val title: String,
@@ -85,6 +76,7 @@ data class Program(
 enum class Goal(val display: String) {
     HYPERTROPHY("Muscle growth"),
     STRENGTH("Strength"),
+    FAT_LOSS("Fat loss"),
     GENERAL("General fitness")
 }
 
