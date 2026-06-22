@@ -92,9 +92,8 @@ class ExerciseRepository(
     ): List<ExerciseEntity> = dao.generatorLibrary(includePunchBag = includePunchBag)
 
     suspend fun count(): Int = dao.count()
-}
-
     /** Update the API key used for future sync calls */
     fun updateApiKey(key: String) {
         client = ExerciseApiClient(key)
     }
+}
