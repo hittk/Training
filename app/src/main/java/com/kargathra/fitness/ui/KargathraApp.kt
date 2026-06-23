@@ -16,7 +16,6 @@ import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import com.kargathra.fitness.data.repo.ExerciseRepository
-import com.kargathra.fitness.data.repo.SyncState
 import com.kargathra.fitness.data.repo.WorkoutRepository
 import com.kargathra.fitness.data.model.Routine
 import com.kargathra.fitness.data.sample.SampleData
@@ -45,24 +44,14 @@ fun KargathraApp(
     var activeRoutine by remember { mutableStateOf<Routine>(SampleData.upperBodyDay) }
     val context       = LocalContext.current
     val prefs         = remember { context.getSharedPreferences("kargathra", Context.MODE_PRIVATE) }
-    var apiKey        by remember { mutableStateOf(prefs.getString("exercise_api_key", "") ?: "") }
-    var anthropicKey  by remember { mutableStateOf(prefs.getString("anthropic_api_key", "") ?: "") }
-    var hasPunchBag   by remember { mutableStateOf(false) }
+    var hasPunchBag   by remember { mutableStateOf(prefs.getBoolean("has_punch_bag", false)) }
     var exerciseCount by remember { mutableIntStateOf(0) }
-    var syncState     by remember { mutableStateOf<SyncState>(SyncState.Idle) }
 
-    // Refresh exercise count when sync state changes
-    LaunchedEffect(syncState) {
-        exerciseCount = exerciseRepo.count()
+    // Load the bundled library and report the count
+    LaunchedEffect(Unit) {
+        exerciseCount = exerciseRepo.ensureLoaded()
     }
 
-    val syncStatus = when (val s = syncState) {
-        is SyncState.Idle        -> ""
-        is SyncState.Syncing     -> "Syncing… batch ${s.batchDone}/${s.batchTotal} (${s.exerciseCount} so far)"
-        is SyncState.Done        -> "Synced ${s.count} exercises"
-        is SyncState.RateLimited -> "Rate limited — try again in a few minutes"
-        is SyncState.Error       -> "Error: ${s.message}"
-    }
 
     val title = when {
         currentRoute == SETTINGS_ROUTE  -> "Settings"
@@ -158,33 +147,19 @@ fun KargathraApp(
             composable(SETTINGS_ROUTE) {
                 SettingsScreen(
                     healthStatusText = healthStatusText,
-                    apiKey           = apiKey,
-                    onApiKeyChange   = {
-                        apiKey = it
-                        prefs.edit().putString("exercise_api_key", it).apply()
-                    },
-                    anthropicKey         = anthropicKey,
-                    onAnthropicKeyChange = {
-                        anthropicKey = it
-                        prefs.edit().putString("anthropic_api_key", it).apply()
-                    },
                     hasPunchBag      = hasPunchBag,
-                    onPunchBagChange = { hasPunchBag = it },
-                    exerciseCount    = exerciseCount,
-                    syncStatus       = syncStatus,
-                    onSyncNow        = {
-                        scope.launch {
-                            exerciseRepo.updateApiKey(apiKey)
-                            exerciseRepo.sync { syncState = it }
-                            exerciseCount = exerciseRepo.count()
-                        }
-                    }
+                    onPunchBagChange = {
+                        hasPunchBag = it
+                        prefs.edit().putBoolean("has_punch_bag", it).apply()
+                    },
+                    exerciseCount    = exerciseCount
                 )
             }
 
             composable(GENERATOR_ROUTE) {
                 WorkoutGeneratorScreen(
-                    anthropicApiKey = anthropicKey,
+                    exerciseRepo    = exerciseRepo,
+                    includePunchBag = hasPunchBag,
                     onBack          = { nav.popBackStack() },
                     onLoadRoutine = { routine ->
                         activeRoutine = routine

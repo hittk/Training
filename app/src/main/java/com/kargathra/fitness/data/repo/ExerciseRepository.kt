@@ -1,59 +1,82 @@
 package com.kargathra.fitness.data.repo
 
-import com.kargathra.fitness.data.api.ExerciseApiClient
-import com.kargathra.fitness.data.api.RateLimitException
+import android.content.Context
+import com.kargathra.fitness.R
 import com.kargathra.fitness.data.db.ExerciseDao
 import com.kargathra.fitness.data.db.ExerciseEntity
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.withContext
+import org.json.JSONArray
+import org.json.JSONObject
 
-/** How old the cache must be (ms) before a background refresh is triggered */
-private const val CACHE_TTL_MS = 24L * 60 * 60 * 1_000 // 24 hours
-
-sealed class SyncState {
-    object Idle : SyncState()
-    data class Syncing(val batchDone: Int, val batchTotal: Int, val exerciseCount: Int) : SyncState()
-    data class Done(val count: Int) : SyncState()
-    data class Error(val message: String) : SyncState()
-    object RateLimited : SyncState()
-}
-
+/**
+ * Exercise library backed entirely by a bundled JSON asset (res/raw/exercises_cache.json).
+ * No network, no API key — the 461-exercise library ships inside the app and is
+ * loaded into Room once on first launch.
+ */
 class ExerciseRepository(
-    val dao: ExerciseDao,
-    private val apiKey: String
+    private val dao: ExerciseDao,
+    private val appContext: Context
 ) {
-    private var client = ExerciseApiClient(apiKey)
 
-    // ── Cache management ──────────────────────────────────────────────────────
-
-    /** Returns true if the cache is empty or older than [CACHE_TTL_MS]. */
-    suspend fun needsSync(): Boolean {
-        val count = dao.count()
-        if (count == 0) return true
-        val oldest = dao.oldestFetchMs() ?: return true
-        return (System.currentTimeMillis() - oldest) > CACHE_TTL_MS
-    }
+    /** True if Room has not yet been populated from the bundled asset. */
+    suspend fun needsLoad(): Boolean = dao.count() == 0
 
     /**
-     * Fetches all exercise batches from the API and stores them in Room.
-     * Calls [onState] with progress updates throughout.
-     * Safe to call even if cache is fresh — caller should check [needsSync] first.
+     * Loads the bundled exercise library into Room if it isn't already there.
+     * Idempotent and cheap to call on every launch — returns early once populated.
+     * Returns the number of exercises now in the database.
      */
-    suspend fun sync(onState: (SyncState) -> Unit) {
-        onState(SyncState.Syncing(0, 10, 0))
-        try {
-            val exercises = client.fetchAll { batchDone, batchTotal, count ->
-                onState(SyncState.Syncing(batchDone, batchTotal, count))
+    suspend fun ensureLoaded(): Int = withContext(Dispatchers.IO) {
+        if (dao.count() > 0) return@withContext dao.count()
+
+        val raw = appContext.resources.openRawResource(R.raw.exercises_cache)
+            .bufferedReader().use { it.readText() }
+
+        val root = JSONObject(raw)
+        val arr: JSONArray = root.getJSONArray("exercises")
+        val now = System.currentTimeMillis()
+
+        val entities = ArrayList<ExerciseEntity>(arr.length())
+        for (i in 0 until arr.length()) {
+            parseEntity(arr.getJSONObject(i), now)?.let { entities += it }
+        }
+        if (entities.isNotEmpty()) dao.upsertAll(entities)
+        dao.count()
+    }
+
+    private fun parseEntity(o: JSONObject, fetchedAt: Long): ExerciseEntity? {
+        return try {
+            // Lists are already pipe-joined? No — the cache stores JSON arrays.
+            // Convert arrays → pipe-delimited strings to match the entity schema.
+            fun pipe(key: String): String {
+                val a = o.optJSONArray(key) ?: return ""
+                return (0 until a.length()).joinToString("|") { a.getString(it).trim() }
             }
-            if (exercises.isNotEmpty()) {
-                dao.upsertAll(exercises)
-                onState(SyncState.Done(exercises.size))
-            } else {
-                onState(SyncState.Error("No exercises returned — check API key in settings"))
-            }
-        } catch (e: RateLimitException) {
-            onState(SyncState.RateLimited)
+            ExerciseEntity(
+                id               = o.getString("id"),
+                name             = o.getString("name"),
+                category         = o.optString("category", ""),
+                equipment        = o.optString("equipment", ""),
+                mechanic         = o.optString("mechanic", ""),
+                force            = o.optString("force", ""),
+                level            = o.optString("level", ""),
+                primaryMuscles   = pipe("primaryMuscles"),
+                secondaryMuscles = pipe("secondaryMuscles"),
+                overview         = o.optString("overview", ""),
+                instructions     = pipe("instructions"),
+                exerciseTips     = pipe("exerciseTips"),
+                commonMistakes   = pipe("commonMistakes"),
+                safetyInfo       = o.optString("safetyInfo", ""),
+                variations       = pipe("variations"),
+                videoUrl         = o.optString("videoUrl", ""),
+                movementFamily   = o.optString("movementFamily", o.getString("name")),
+                requiresPunchBag = o.optBoolean("requiresPunchBag", false),
+                fetchedAt        = fetchedAt
+            )
         } catch (e: Exception) {
-            onState(SyncState.Error(e.message ?: "Unknown error"))
+            null
         }
     }
 
@@ -68,32 +91,22 @@ class ExerciseRepository(
         limit: Int = 40,
         offset: Int = 0
     ): Flow<List<ExerciseEntity>> = dao.search(
-        query          = query.trim(),
-        equipment      = equipment,
-        category       = category,
-        mechanic       = mechanic,
-        includePunchBag= includePunchBag,
-        limit          = limit,
-        offset         = offset
+        query           = query.trim(),
+        equipment       = equipment,
+        category        = category,
+        mechanic        = mechanic,
+        includePunchBag = includePunchBag,
+        limit           = limit,
+        offset          = offset
     )
 
     fun equipmentList(): Flow<List<String>> = dao.equipmentList()
 
     suspend fun getById(id: String): ExerciseEntity? = dao.getById(id)
 
-    // ── AI generator library ──────────────────────────────────────────────────
-
-    /**
-     * Returns one exercise per movement family, compound-first.
-     * Used by the AI workout generator to build its exercise name list.
-     */
-    suspend fun generatorLibrary(
-        includePunchBag: Boolean = false
-    ): List<ExerciseEntity> = dao.generatorLibrary(includePunchBag = includePunchBag)
+    /** One exercise per movement family, compound-first — used by the local generator. */
+    suspend fun generatorLibrary(includePunchBag: Boolean = false): List<ExerciseEntity> =
+        dao.generatorLibrary(includePunchBag = includePunchBag)
 
     suspend fun count(): Int = dao.count()
-    /** Update the API key used for future sync calls */
-    fun updateApiKey(key: String) {
-        client = ExerciseApiClient(key)
-    }
 }

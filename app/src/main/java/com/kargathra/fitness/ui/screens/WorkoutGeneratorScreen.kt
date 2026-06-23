@@ -11,24 +11,23 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import com.kargathra.fitness.data.generator.LocalRoutineGenerator
 import com.kargathra.fitness.data.model.*
-import com.kargathra.fitness.data.sample.SampleData
+import com.kargathra.fitness.data.repo.ExerciseRepository
 import com.kargathra.fitness.ui.components.KCard
 import com.kargathra.fitness.ui.components.SectionLabel
 import com.kargathra.fitness.ui.components.Tag
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
-import org.json.JSONObject
 
 /**
- * AI workout generator. Collects goal, experience, days/week, session length and
- * target muscles, then calls the Claude API to produce a structured routine.
- * The result is previewed in-screen and the user can load it onto the Workout page.
+ * Workout generator. Collects goal, experience, session length and target muscles,
+ * then builds a balanced routine locally from the cached exercise library —
+ * no network, no API key. Result is previewed and can be loaded onto the Workout page.
  */
 @Composable
 fun WorkoutGeneratorScreen(
-    anthropicApiKey: String,
+    exerciseRepo: ExerciseRepository,
+    includePunchBag: Boolean = false,
     onBack: () -> Unit,
     onLoadRoutine: (Routine) -> Unit,
     modifier: Modifier = Modifier
@@ -149,23 +148,23 @@ fun WorkoutGeneratorScreen(
                 errorMsg = null
                 isLoading = true
                 generatedRoutine = null
-                if (anthropicApiKey.isBlank()) {
-                    errorMsg = "Add your Anthropic API key in Settings to use the generator."
-                    isLoading = false
-                    return@Button
-                }
                 scope.launch {
                     try {
-                        val routine = callClaudeForRoutine(
-                            anthropicApiKey = anthropicApiKey,
-                            goal = goal,
-                            experience = experience,
-                            sessionMinutes = sessionMinutes,
-                            focusAreas = focusAreas.toList()
-                        )
-                        generatedRoutine = routine
+                        val library = exerciseRepo.generatorLibrary(includePunchBag)
+                        if (library.isEmpty()) {
+                            errorMsg = "Exercise library is still loading — try again in a moment."
+                        } else {
+                            generatedRoutine = LocalRoutineGenerator.generate(
+                                library        = library,
+                                goal           = goal,
+                                experience     = experience,
+                                sessionMinutes = sessionMinutes,
+                                targetGroups   = focusAreas.toList(),
+                                includePunchBag= includePunchBag
+                            )
+                        }
                     } catch (e: Exception) {
-                        errorMsg = "Generation failed: ${e.message}"
+                        errorMsg = "Couldn't build a routine: ${e.message}"
                     } finally {
                         isLoading = false
                     }
@@ -238,144 +237,4 @@ fun WorkoutGeneratorScreen(
             Text("Back to Programs")
         }
     }
-}
-
-// ── Claude API call ──────────────────────────────────────────────────────────
-
-private suspend fun callClaudeForRoutine(
-    anthropicApiKey: String,
-    goal: Goal,
-    experience: Experience,
-    sessionMinutes: Int,
-    focusAreas: List<MuscleGroup>
-): Routine = withContext(Dispatchers.IO) {
-
-    val equipment = SampleData.ownedEquipment.joinToString(", ") { it.display }
-    val focus = if (focusAreas.isEmpty()) "balanced full body"
-                else focusAreas.joinToString(", ") { it.display }
-    val exerciseNames = SampleData.allRoutines
-        .flatMap { it.items }
-        .map { it.exercise.name }
-        .distinct()
-        .joinToString(", ")
-
-    val prompt = """
-You are a personal trainer building a single gym session for one person.
-
-User profile:
-- Goal: ${goal.display}
-- Experience: ${experience.display}
-- Session length: ~$sessionMinutes minutes
-- Target muscles: $focus
-- Available equipment: $equipment
-
-You MUST only use exercises from this exact list (use these exact names):
-$exerciseNames
-
-Respond with ONLY a valid JSON object — no markdown, no explanation, nothing else.
-Schema:
-{
-  "title": "string",
-  "estimatedMinutes": number,
-  "focus": ["MuscleGroup display name", ...],
-  "exercises": [
-    {
-      "name": "exact exercise name from the list above",
-      "sets": number,
-      "repsMin": number,
-      "repsMax": number,
-      "restSeconds": number
-    }
-  ]
-}
-
-Rules:
-- Include 4–7 exercises appropriate for the session length and goal.
-- For cardio exercises (Spin Bike Intervals, Incline Treadmill Walk) use repsMin=0, repsMax=0.
-- Rest 90–150s for compound, 60–90s for isolation, goal-appropriate.
-- Heavier loads / lower reps for Strength, moderate for Hypertrophy, higher reps for Fat loss.
-""".trimIndent()
-
-    val requestBody = JSONObject().apply {
-        put("model", "claude-sonnet-4-6")
-        put("max_tokens", 1000)
-        put("messages", org.json.JSONArray().apply {
-            put(JSONObject().apply {
-                put("role", "user")
-                put("content", prompt)
-            })
-        })
-    }
-
-    val url = java.net.URL("https://api.anthropic.com/v1/messages")
-    val conn = url.openConnection() as java.net.HttpURLConnection
-    conn.requestMethod = "POST"
-    conn.setRequestProperty("Content-Type", "application/json")
-    conn.setRequestProperty("x-api-key", anthropicApiKey)
-    conn.setRequestProperty("anthropic-version", "2023-06-01")
-    conn.doOutput = true
-    conn.connectTimeout = 15_000
-    conn.readTimeout = 30_000
-    conn.outputStream.use { it.write(requestBody.toString().toByteArray()) }
-
-    val code = conn.responseCode
-    if (code != 200) {
-        val err = (conn.errorStream ?: conn.inputStream)?.bufferedReader()?.readText().orEmpty()
-        // Surface the API's own error message where possible
-        val detail = runCatching {
-            JSONObject(err).getJSONObject("error").getString("message")
-        }.getOrDefault(err.take(140))
-        throw IllegalStateException("HTTP $code — $detail")
-    }
-
-    val responseText = conn.inputStream.bufferedReader().readText()
-    val json = JSONObject(responseText)
-
-    // Extract the text content block
-    val content = json.getJSONArray("content").getJSONObject(0).getString("text").trim()
-    parseRoutineJson(content)
-}
-
-private fun parseRoutineJson(json: String): Routine {
-    val obj = JSONObject(json)
-    val exerciseArray = obj.getJSONArray("exercises")
-
-    // Build a name→Exercise lookup from the full library
-    val library = SampleData.allRoutines.flatMap { it.items.map { i -> i.exercise } }
-        .distinctBy { it.id }
-        .associateBy { it.name.lowercase() }
-
-    val items = mutableListOf<RoutineItem>()
-    for (i in 0 until exerciseArray.length()) {
-        val ex = exerciseArray.getJSONObject(i)
-        val name = ex.getString("name")
-        val exercise = library[name.lowercase()] ?: continue // skip unknown
-        items.add(
-            RoutineItem(
-                exercise = exercise,
-                sets = ex.getInt("sets"),
-                repTarget = ex.getInt("repsMin")..ex.getInt("repsMax"),
-                restSeconds = ex.getInt("restSeconds")
-            )
-        )
-    }
-
-    if (items.isEmpty()) throw IllegalStateException("No recognisable exercises in response")
-
-    val focusArray = obj.getJSONArray("focus")
-    val focusGroups = (0 until focusArray.length())
-        .mapNotNull { idx ->
-            MuscleGroup.entries.firstOrNull {
-                it.display.equals(focusArray.getString(idx), ignoreCase = true)
-            }
-        }
-
-    return Routine(
-        id = "ai_${System.currentTimeMillis()}",
-        title = obj.getString("title"),
-        focus = focusGroups,
-        items = items,
-        estimatedMinutes = obj.getInt("estimatedMinutes"),
-        isGenerated = true
-    )
 }

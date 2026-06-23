@@ -1,14 +1,19 @@
 package com.kargathra.fitness
 
 import android.app.Application
-import android.content.Context
 import androidx.room.Room
 import com.kargathra.fitness.data.db.KargathraDatabase
 import com.kargathra.fitness.data.repo.ExerciseRepository
 import com.kargathra.fitness.data.repo.WorkoutRepository
 import com.kargathra.fitness.health.HealthConnectManager
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.launch
 
 class App : Application() {
+
+    private val appScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
     val database: KargathraDatabase by lazy {
         Room.databaseBuilder(this, KargathraDatabase::class.java, "kargathra.db")
@@ -23,9 +28,12 @@ class App : Application() {
     }
 
     val exerciseRepository: ExerciseRepository by lazy {
-        // Key is stored in SharedPreferences and entered via Settings screen
-        val prefs = getSharedPreferences("kargathra", Context.MODE_PRIVATE)
-        val key = prefs.getString("exercise_api_key", "") ?: ""
-        ExerciseRepository(database.exerciseDao(), key)
+        ExerciseRepository(database.exerciseDao(), applicationContext)
+    }
+
+    override fun onCreate() {
+        super.onCreate()
+        // Populate the exercise library from the bundled asset on first launch.
+        appScope.launch { exerciseRepository.ensureLoaded() }
     }
 }

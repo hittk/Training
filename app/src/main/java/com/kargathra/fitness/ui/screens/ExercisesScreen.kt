@@ -12,7 +12,6 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Search
-import androidx.compose.material.icons.filled.Sync
 import androidx.compose.material.icons.outlined.FitnessCenter
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -24,12 +23,10 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.kargathra.fitness.data.db.ExerciseEntity
 import com.kargathra.fitness.data.db.splitPipe
 import com.kargathra.fitness.data.repo.ExerciseRepository
-import com.kargathra.fitness.data.repo.SyncState
 import com.kargathra.fitness.ui.components.KCard
 import com.kargathra.fitness.ui.components.SectionLabel
 import com.kargathra.fitness.ui.components.Tag
 import com.kargathra.fitness.ui.theme.Gold
-import kotlinx.coroutines.launch
 
 @Composable
 fun ExercisesScreen(
@@ -37,12 +34,10 @@ fun ExercisesScreen(
     hasPunchBag: Boolean = false,
     modifier: Modifier = Modifier
 ) {
-    val scope = rememberCoroutineScope()
 
     var query      by remember { mutableStateOf("") }
     var equipment  by remember { mutableStateOf("") }
     var mechanic   by remember { mutableStateOf("") }
-    var syncState  by remember { mutableStateOf<SyncState>(SyncState.Idle) }
     var detailEx   by remember { mutableStateOf<ExerciseEntity?>(null) }
 
     val exercises by repo.search(
@@ -55,14 +50,8 @@ fun ExercisesScreen(
     val equipmentOptions by repo.equipmentList()
         .collectAsStateWithLifecycle(emptyList())
 
-    // Trigger sync on first composition if needed
-    LaunchedEffect(Unit) {
-        if (repo.needsSync()) {
-            scope.launch {
-                repo.sync { syncState = it }
-            }
-        }
-    }
+    // Ensure the bundled library is loaded
+    LaunchedEffect(Unit) { repo.ensureLoaded() }
 
     // Detail bottom sheet
     detailEx?.let { ex ->
@@ -114,19 +103,10 @@ fun ExercisesScreen(
 
         Spacer(Modifier.height(8.dp))
 
-        // ── Sync state banner ──────────────────────────────────────────────────
-        AnimatedVisibility(visible = syncState !is SyncState.Idle && syncState !is SyncState.Done) {
-            SyncBanner(state = syncState, onRetry = {
-                scope.launch { repo.sync { syncState = it } }
-            })
-        }
 
         // ── Exercise list ──────────────────────────────────────────────────────
-        if (exercises.isEmpty() && syncState is SyncState.Idle) {
-            EmptyState(
-                hasApiKey = true,
-                onSync    = { scope.launch { repo.sync { syncState = it } } }
-            )
+        if (exercises.isEmpty()) {
+            EmptyState()
         } else {
             val listState = rememberLazyListState()
             LazyColumn(
@@ -312,62 +292,10 @@ private fun ExerciseDetailSheet(ex: ExerciseEntity, onDismiss: () -> Unit) {
     }
 }
 
-// ── Sync state banner ─────────────────────────────────────────────────────────
-
-@Composable
-private fun SyncBanner(state: SyncState, onRetry: () -> Unit) {
-    Surface(
-        color    = MaterialTheme.colorScheme.primaryContainer,
-        modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 4.dp)
-    ) {
-        Row(
-            Modifier.padding(12.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            when (state) {
-                is SyncState.Syncing -> {
-                    CircularProgressIndicator(
-                        modifier    = Modifier.size(16.dp),
-                        strokeWidth = 2.dp,
-                        color       = MaterialTheme.colorScheme.onPrimaryContainer
-                    )
-                    Spacer(Modifier.width(10.dp))
-                    Text(
-                        "Syncing exercises… batch ${state.batchDone}/${state.batchTotal}" +
-                                " (${state.exerciseCount} so far)",
-                        style    = MaterialTheme.typography.bodyMedium,
-                        color    = MaterialTheme.colorScheme.onPrimaryContainer
-                    )
-                }
-                is SyncState.Error -> {
-                    Text(
-                        "Sync failed: ${state.message}",
-                        style    = MaterialTheme.typography.bodyMedium,
-                        color    = MaterialTheme.colorScheme.error,
-                        modifier = Modifier.weight(1f)
-                    )
-                    TextButton(onClick = onRetry) { Text("Retry") }
-                }
-                is SyncState.RateLimited -> {
-                    Icon(Icons.Filled.Sync, contentDescription = null,
-                        tint = MaterialTheme.colorScheme.onPrimaryContainer)
-                    Spacer(Modifier.width(10.dp))
-                    Text(
-                        "Rate limited — sync will resume in a few minutes",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onPrimaryContainer
-                    )
-                }
-                else -> {}
-            }
-        }
-    }
-}
-
 // ── Empty state ───────────────────────────────────────────────────────────────
 
 @Composable
-private fun EmptyState(hasApiKey: Boolean, onSync: () -> Unit) {
+private fun EmptyState() {
     Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
         Column(
             horizontalAlignment = Alignment.CenterHorizontally,
@@ -381,15 +309,10 @@ private fun EmptyState(hasApiKey: Boolean, onSync: () -> Unit) {
             )
             Spacer(Modifier.height(16.dp))
             Text(
-                if (hasApiKey) "Exercise library not synced yet"
-                else "Add your exerciseapi.dev key in Settings to load the exercise library",
-                style     = MaterialTheme.typography.bodyLarge,
-                color     = MaterialTheme.colorScheme.onSurfaceVariant
+                "Loading exercise library…",
+                style = MaterialTheme.typography.bodyLarge,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
             )
-            if (hasApiKey) {
-                Spacer(Modifier.height(16.dp))
-                Button(onClick = onSync) { Text("Sync now") }
-            }
         }
     }
 }
