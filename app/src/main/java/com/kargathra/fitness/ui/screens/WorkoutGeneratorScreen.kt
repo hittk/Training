@@ -28,6 +28,7 @@ import org.json.JSONObject
  */
 @Composable
 fun WorkoutGeneratorScreen(
+    anthropicApiKey: String,
     onBack: () -> Unit,
     onLoadRoutine: (Routine) -> Unit,
     modifier: Modifier = Modifier
@@ -148,9 +149,15 @@ fun WorkoutGeneratorScreen(
                 errorMsg = null
                 isLoading = true
                 generatedRoutine = null
+                if (anthropicApiKey.isBlank()) {
+                    errorMsg = "Add your Anthropic API key in Settings to use the generator."
+                    isLoading = false
+                    return@Button
+                }
                 scope.launch {
                     try {
                         val routine = callClaudeForRoutine(
+                            anthropicApiKey = anthropicApiKey,
                             goal = goal,
                             experience = experience,
                             sessionMinutes = sessionMinutes,
@@ -236,6 +243,7 @@ fun WorkoutGeneratorScreen(
 // ── Claude API call ──────────────────────────────────────────────────────────
 
 private suspend fun callClaudeForRoutine(
+    anthropicApiKey: String,
     goal: Goal,
     experience: Experience,
     sessionMinutes: Int,
@@ -303,10 +311,22 @@ Rules:
     val conn = url.openConnection() as java.net.HttpURLConnection
     conn.requestMethod = "POST"
     conn.setRequestProperty("Content-Type", "application/json")
+    conn.setRequestProperty("x-api-key", anthropicApiKey)
+    conn.setRequestProperty("anthropic-version", "2023-06-01")
     conn.doOutput = true
     conn.connectTimeout = 15_000
     conn.readTimeout = 30_000
     conn.outputStream.use { it.write(requestBody.toString().toByteArray()) }
+
+    val code = conn.responseCode
+    if (code != 200) {
+        val err = (conn.errorStream ?: conn.inputStream)?.bufferedReader()?.readText().orEmpty()
+        // Surface the API's own error message where possible
+        val detail = runCatching {
+            JSONObject(err).getJSONObject("error").getString("message")
+        }.getOrDefault(err.take(140))
+        throw IllegalStateException("HTTP $code — $detail")
+    }
 
     val responseText = conn.inputStream.bufferedReader().readText()
     val json = JSONObject(responseText)

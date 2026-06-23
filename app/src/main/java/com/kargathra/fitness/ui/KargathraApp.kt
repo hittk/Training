@@ -46,6 +46,7 @@ fun KargathraApp(
     val context       = LocalContext.current
     val prefs         = remember { context.getSharedPreferences("kargathra", Context.MODE_PRIVATE) }
     var apiKey        by remember { mutableStateOf(prefs.getString("exercise_api_key", "") ?: "") }
+    var anthropicKey  by remember { mutableStateOf(prefs.getString("anthropic_api_key", "") ?: "") }
     var hasPunchBag   by remember { mutableStateOf(false) }
     var exerciseCount by remember { mutableIntStateOf(0) }
     var syncState     by remember { mutableStateOf<SyncState>(SyncState.Idle) }
@@ -53,6 +54,14 @@ fun KargathraApp(
     // Refresh exercise count when sync state changes
     LaunchedEffect(syncState) {
         exerciseCount = exerciseRepo.count()
+    }
+
+    val syncStatus = when (val s = syncState) {
+        is SyncState.Idle        -> ""
+        is SyncState.Syncing     -> "Syncing… batch ${s.batchDone}/${s.batchTotal} (${s.exerciseCount} so far)"
+        is SyncState.Done        -> "Synced ${s.count} exercises"
+        is SyncState.RateLimited -> "Rate limited — try again in a few minutes"
+        is SyncState.Error       -> "Error: ${s.message}"
     }
 
     val title = when {
@@ -154,9 +163,15 @@ fun KargathraApp(
                         apiKey = it
                         prefs.edit().putString("exercise_api_key", it).apply()
                     },
+                    anthropicKey         = anthropicKey,
+                    onAnthropicKeyChange = {
+                        anthropicKey = it
+                        prefs.edit().putString("anthropic_api_key", it).apply()
+                    },
                     hasPunchBag      = hasPunchBag,
                     onPunchBagChange = { hasPunchBag = it },
                     exerciseCount    = exerciseCount,
+                    syncStatus       = syncStatus,
                     onSyncNow        = {
                         scope.launch {
                             exerciseRepo.updateApiKey(apiKey)
@@ -169,7 +184,8 @@ fun KargathraApp(
 
             composable(GENERATOR_ROUTE) {
                 WorkoutGeneratorScreen(
-                    onBack        = { nav.popBackStack() },
+                    anthropicApiKey = anthropicKey,
+                    onBack          = { nav.popBackStack() },
                     onLoadRoutine = { routine ->
                         activeRoutine = routine
                         nav.navigate(Destination.WORKOUT.route) {

@@ -25,13 +25,17 @@ fun SettingsScreen(
     healthStatusText: String,
     apiKey: String,
     onApiKeyChange: (String) -> Unit,
+    anthropicKey: String,
+    onAnthropicKeyChange: (String) -> Unit,
     hasPunchBag: Boolean,
     onPunchBagChange: (Boolean) -> Unit,
     exerciseCount: Int,
+    syncStatus: String,
     onSyncNow: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     var keyVisible by remember { mutableStateOf(false) }
+    var aKeyVisible by remember { mutableStateOf(false) }
 
     Column(
         modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(20.dp),
@@ -73,9 +77,56 @@ fun SettingsScreen(
             OutlinedButton(onClick = onSyncNow, modifier = Modifier.fillMaxWidth()) {
                 Text(if (exerciseCount > 0) "Re-sync library" else "Sync now")
             }
+            if (syncStatus.isNotEmpty()) {
+                Spacer(Modifier.height(8.dp))
+                Text(
+                    syncStatus,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = if (syncStatus.startsWith("Error") || syncStatus.contains("failed"))
+                                MaterialTheme.colorScheme.error
+                            else MaterialTheme.colorScheme.primary
+                )
+            }
             Text(
                 "Your key is stored on-device only, sent exclusively to api.exerciseapi.dev. " +
                 "The library syncs once per 24 hours — the first sync uses ~25 API calls.",
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(top = 8.dp)
+            )
+        }
+
+        // ── AI generator key ─────────────────────────────────────────────────────
+        SectionLabel("AI workout generator")
+        KCard {
+            Text("Anthropic API key", style = MaterialTheme.typography.titleLarge)
+            Text(
+                "Required for the \"Build my workout\" generator. Get one at console.anthropic.com.",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(top = 2.dp, bottom = 12.dp)
+            )
+            OutlinedTextField(
+                value         = anthropicKey,
+                onValueChange = onAnthropicKeyChange,
+                label         = { Text("Anthropic key") },
+                placeholder   = { Text("sk-ant-…") },
+                singleLine    = true,
+                visualTransformation = if (aKeyVisible) VisualTransformation.None
+                                       else PasswordVisualTransformation(),
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
+                trailingIcon  = {
+                    IconButton(onClick = { aKeyVisible = !aKeyVisible }) {
+                        Icon(
+                            if (aKeyVisible) Icons.Filled.VisibilityOff else Icons.Filled.Visibility,
+                            contentDescription = if (aKeyVisible) "Hide key" else "Show key"
+                        )
+                    }
+                },
+                modifier = Modifier.fillMaxWidth()
+            )
+            Text(
+                "Stored on-device only. Sent solely to api.anthropic.com.",
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.padding(top = 8.dp)
