@@ -17,6 +17,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -24,6 +25,7 @@ import com.kargathra.fitness.data.db.ExerciseEntity
 import com.kargathra.fitness.data.db.splitPipe
 import com.kargathra.fitness.data.repo.ExerciseRepository
 import com.kargathra.fitness.ui.components.KCard
+import com.kargathra.fitness.ui.components.ExerciseVideo
 import com.kargathra.fitness.ui.components.SectionLabel
 import com.kargathra.fitness.ui.components.Tag
 import com.kargathra.fitness.ui.theme.Gold
@@ -184,6 +186,14 @@ private fun ExerciseDetailSheet(ex: ExerciseEntity, onDismiss: () -> Unit) {
             verticalArrangement = Arrangement.spacedBy(16.dp),
             modifier = Modifier.fillMaxWidth()
         ) {
+            if (ex.videoUrl.isNotEmpty()) {
+                item {
+                    ExerciseVideo(
+                        videoUrl = ex.videoUrl,
+                        modifier = Modifier.clip(MaterialTheme.shapes.medium)
+                    )
+                }
+            }
             item {
                 Text(ex.name, style = MaterialTheme.typography.headlineSmall)
                 Spacer(Modifier.height(6.dp))
