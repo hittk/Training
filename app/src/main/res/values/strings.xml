@@ -1,4 +1,4 @@
 <resources>
-    <string name="app_name">Kargathra</string>
-    <string name="health_permissions_rationale">Kargathra writes your completed strength sessions to Health Connect, and reads back the heart rate and calories your Fitbit already provides, so all of your training and activity data lives in one place. Data stays on your device. Nothing is uploaded anywhere.</string>
+    <string name="app_name">Deadlift</string>
+    <string name="health_permissions_rationale">Deadlift writes your completed strength sessions to Health Connect, and reads back the heart rate and calories your Fitbit already provides, so all of your training and activity data lives in one place. Data stays on your device. Nothing is uploaded anywhere.</string>
 </resources>
