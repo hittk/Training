@@ -46,7 +46,8 @@ fun ExercisesScreen(
         query          = query,
         equipment      = equipment,
         mechanic       = mechanic,
-        includePunchBag= hasPunchBag
+        includePunchBag= hasPunchBag,
+        limit          = 2000   // show the entire library (461 total) — no practical cap
     ).collectAsStateWithLifecycle(emptyList())
 
     val equipmentOptions by repo.equipmentList()
