@@ -29,20 +29,29 @@ class ExerciseRepository(
      * Returns the number of exercises now in the database.
      */
     suspend fun ensureLoaded(): Int = withContext(Dispatchers.IO) {
-        if (dao.count() > 0) return@withContext dao.count()
-
         val raw = appContext.resources.openRawResource(R.raw.exercises_cache)
             .bufferedReader().use { it.readText() }
-
         val root = JSONObject(raw)
+        val bundledVersion = root.optInt("libraryVersion", 1)
+
+        val prefs = appContext.getSharedPreferences("kargathra", Context.MODE_PRIVATE)
+        val loadedVersion = prefs.getInt("library_version", 0)
+
+        // Load when the DB is empty OR the bundled library is newer than what we
+        // last loaded. upsert (REPLACE) merges by id, so this updates existing
+        // exercises and inserts new ones without wiping anything.
+        if (dao.count() > 0 && loadedVersion >= bundledVersion) {
+            return@withContext dao.count()
+        }
+
         val arr: JSONArray = root.getJSONArray("exercises")
         val now = System.currentTimeMillis()
-
         val entities = ArrayList<ExerciseEntity>(arr.length())
         for (i in 0 until arr.length()) {
             parseEntity(arr.getJSONObject(i), now)?.let { entities += it }
         }
         if (entities.isNotEmpty()) dao.upsertAll(entities)
+        prefs.edit().putInt("library_version", bundledVersion).apply()
         dao.count()
     }
 
