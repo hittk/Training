@@ -52,6 +52,7 @@ class MainActivity : ComponentActivity() {
                         KargathraApp(
                             repo             = (application as App).repository,
                             exerciseRepo     = (application as App).exerciseRepository,
+                            favRepo          = (application as App).favouriteRepository,
                             healthConnected  = isConnected,
                             healthStatusText = if (isConnected) "Connected"
                                               else "Available — not yet granted",

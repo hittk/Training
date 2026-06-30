@@ -7,12 +7,14 @@ import androidx.room.RoomDatabase
     entities = [
         WorkoutEntity::class,
         SetEntity::class,
-        ExerciseEntity::class   // added in v2
+        ExerciseEntity::class,  // added in v2
+        FavouriteEntity::class  // added in v3
     ],
-    version = 2,
+    version = 3,
     exportSchema = false
 )
 abstract class KargathraDatabase : RoomDatabase() {
     abstract fun workoutDao(): WorkoutDao
     abstract fun exerciseDao(): ExerciseDao
+    abstract fun favouriteDao(): FavouriteDao
 }

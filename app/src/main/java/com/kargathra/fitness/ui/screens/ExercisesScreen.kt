@@ -4,6 +4,13 @@ import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
+import kotlinx.coroutines.launch
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.Icon
+import androidx.compose.material.icons.outlined.StarBorder
+import androidx.compose.material.icons.filled.Star
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
@@ -24,6 +31,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.kargathra.fitness.data.db.ExerciseEntity
 import com.kargathra.fitness.data.db.splitPipe
 import com.kargathra.fitness.data.repo.ExerciseRepository
+import com.kargathra.fitness.data.repo.FavouriteRepository
 import com.kargathra.fitness.ui.components.KCard
 import com.kargathra.fitness.data.anatomy.MuscleMap
 import com.kargathra.fitness.ui.components.ExerciseVideo
@@ -35,6 +43,7 @@ import com.kargathra.fitness.ui.theme.Gold
 @Composable
 fun ExercisesScreen(
     repo: ExerciseRepository,
+    favRepo: FavouriteRepository,
     hasPunchBag: Boolean = false,
     modifier: Modifier = Modifier
 ) {
@@ -42,6 +51,7 @@ fun ExercisesScreen(
     var query      by remember { mutableStateOf("") }
     var equipment  by remember { mutableStateOf("") }
     var mechanic   by remember { mutableStateOf("") }
+    var favsOnly   by remember { mutableStateOf(false) }
     var detailEx   by remember { mutableStateOf<ExerciseEntity?>(null) }
 
     val exercises by repo.search(
@@ -52,6 +62,7 @@ fun ExercisesScreen(
         limit          = 2000   // show the entire library (461 total) — no practical cap
     ).collectAsStateWithLifecycle(emptyList())
 
+    val favouriteIds by favRepo.favouriteIds().collectAsStateWithLifecycle(emptyList())
     val equipmentOptions by repo.equipmentList()
         .collectAsStateWithLifecycle(emptyList())
 
@@ -90,8 +101,11 @@ fun ExercisesScreen(
                 .padding(horizontal = 20.dp),
             horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            FilterPill("All", mechanic.isEmpty() && equipment.isEmpty()) {
-                mechanic = ""; equipment = ""
+            FilterPill("★ Favourites", favsOnly) {
+                favsOnly = !favsOnly
+            }
+            FilterPill("All", !favsOnly && mechanic.isEmpty() && equipment.isEmpty()) {
+                favsOnly = false; mechanic = ""; equipment = ""
             }
             FilterPill("Compound", mechanic == "compound") {
                 mechanic = if (mechanic == "compound") "" else "compound"
@@ -110,7 +124,9 @@ fun ExercisesScreen(
 
 
         // ── Exercise list ──────────────────────────────────────────────────────
-        if (exercises.isEmpty()) {
+        val favSet = favouriteIds.toSet()
+        val shown = if (favsOnly) exercises.filter { it.id in favSet } else exercises
+        if (shown.isEmpty()) {
             EmptyState()
         } else {
             val listState = rememberLazyListState()
@@ -122,12 +138,12 @@ fun ExercisesScreen(
             ) {
                 item {
                     Text(
-                        "${exercises.size} exercises",
+                        "${shown.size} exercises",
                         style = MaterialTheme.typography.labelMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
-                items(exercises, key = { it.id }) { ex ->
+                items(shown, key = { it.id }) { ex ->
                     ExerciseCard(ex = ex, onClick = { detailEx = ex })
                 }
             }
@@ -198,7 +214,24 @@ private fun ExerciseDetailSheet(ex: ExerciseEntity, onDismiss: () -> Unit) {
                 }
             }
             item {
-                Text(ex.name, style = MaterialTheme.typography.headlineSmall)
+                val isFav by favRepo.isFavourite(ex.id).collectAsStateWithLifecycle(false)
+                val favScope = rememberCoroutineScope()
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        ex.name,
+                        style = MaterialTheme.typography.headlineSmall,
+                        modifier = Modifier.weight(1f)
+                    )
+                    IconButton(onClick = {
+                        favScope.launch { favRepo.toggle(ex.id, !isFav) }
+                    }) {
+                        Icon(
+                            imageVector = if (isFav) Icons.Filled.Star else Icons.Outlined.StarBorder,
+                            contentDescription = if (isFav) "Remove from favourites" else "Add to favourites",
+                            tint = if (isFav) Gold else MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
                 Spacer(Modifier.height(6.dp))
                 Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                     if (ex.equipment.isNotEmpty()) Tag(ex.equipment.replaceFirstChar { it.uppercase() })

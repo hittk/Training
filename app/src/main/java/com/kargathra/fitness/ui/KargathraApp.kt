@@ -16,6 +16,7 @@ import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import com.kargathra.fitness.data.repo.ExerciseRepository
+import com.kargathra.fitness.data.repo.FavouriteRepository
 import com.kargathra.fitness.data.repo.WorkoutRepository
 import com.kargathra.fitness.data.model.Routine
 import com.kargathra.fitness.data.sample.SampleData
@@ -31,6 +32,7 @@ private const val GENERATOR_ROUTE = "generator"
 fun KargathraApp(
     repo: WorkoutRepository,
     exerciseRepo: ExerciseRepository,
+    favRepo: FavouriteRepository,
     healthConnected: Boolean,
     healthStatusText: String,
     onConnectHealth: () -> Unit
@@ -138,6 +140,7 @@ fun KargathraApp(
             composable(Destination.EXERCISES.route) {
                 ExercisesScreen(
                     repo        = exerciseRepo,
+                    favRepo     = favRepo,
                     hasPunchBag = hasPunchBag
                 )
             }
