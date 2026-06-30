@@ -4,6 +4,8 @@ import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import kotlinx.coroutines.launch
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.material3.IconButton
@@ -35,6 +37,7 @@ import com.kargathra.fitness.data.repo.FavouriteRepository
 import com.kargathra.fitness.ui.components.KCard
 import com.kargathra.fitness.data.anatomy.MuscleMap
 import com.kargathra.fitness.ui.components.ExerciseVideo
+import com.kargathra.fitness.ui.components.sanitiseResName
 import com.kargathra.fitness.ui.components.MuscleMapView
 import com.kargathra.fitness.ui.components.SectionLabel
 import com.kargathra.fitness.ui.components.Tag
@@ -71,7 +74,13 @@ fun ExercisesScreen(
 
     // Detail bottom sheet
     detailEx?.let { ex ->
-        ExerciseDetailSheet(ex = ex, onDismiss = { detailEx = null })
+        ExerciseDetailSheet(
+            ex = ex,
+            repo = repo,
+            favRepo = favRepo,
+            onOpenExercise = { detailEx = it },
+            onDismiss = { detailEx = null }
+        )
     }
 
     Column(modifier.fillMaxSize()) {
@@ -190,10 +199,17 @@ private fun ExerciseCard(ex: ExerciseEntity, onClick: () -> Unit) {
 
 // ── Detail bottom sheet ───────────────────────────────────────────────────────
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
-private fun ExerciseDetailSheet(ex: ExerciseEntity, onDismiss: () -> Unit) {
+private fun ExerciseDetailSheet(
+    ex: ExerciseEntity,
+    repo: ExerciseRepository,
+    favRepo: FavouriteRepository,
+    onOpenExercise: (ExerciseEntity) -> Unit,
+    onDismiss: () -> Unit
+) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    val ctx = androidx.compose.ui.platform.LocalContext.current
 
     ModalBottomSheet(
         onDismissRequest = onDismiss,
@@ -205,11 +221,17 @@ private fun ExerciseDetailSheet(ex: ExerciseEntity, onDismiss: () -> Unit) {
             verticalArrangement = Arrangement.spacedBy(16.dp),
             modifier = Modifier.fillMaxWidth()
         ) {
-            if (ex.videoUrl.isNotEmpty()) {
+            val hasBundledById = remember(ex.id) {
+                ctx.resources.getIdentifier(
+                    "vid_${sanitiseResName(ex.id)}", "raw", ctx.packageName
+                ) != 0
+            }
+            if (ex.videoUrl.isNotEmpty() || hasBundledById) {
                 item {
                     ExerciseVideo(
-                        videoUrl = ex.videoUrl,
-                        modifier = Modifier.clip(MaterialTheme.shapes.medium)
+                        videoUrl   = ex.videoUrl,
+                        fallbackId = ex.id,
+                        modifier   = Modifier.clip(MaterialTheme.shapes.medium)
                     )
                 }
             }
@@ -337,11 +359,30 @@ private fun ExerciseDetailSheet(ex: ExerciseEntity, onDismiss: () -> Unit) {
             if (variations.isNotEmpty()) {
                 item {
                     SectionLabel("Variations")
-                    Row(
-                        Modifier.horizontalScroll(rememberScrollState()),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        variations.forEach { Tag(it) }
+                    var links by remember(ex.id) {
+                        mutableStateOf<Map<String, ExerciseEntity>>(emptyMap())
+                    }
+                    LaunchedEffect(ex.id) {
+                        val resolved = mutableMapOf<String, ExerciseEntity>()
+                        variations.forEach { name ->
+                            repo.findByName(name)?.let { resolved[name] = it }
+                        }
+                        links = resolved
+                    }
+                    FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        variations.forEach { name ->
+                            val target = links[name]
+                            if (target != null) Tag(name) { onOpenExercise(target) }
+                            else Tag(name)
+                        }
+                    }
+                    if (links.isNotEmpty()) {
+                        Text(
+                            "Tap a highlighted variation to open it",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.padding(top = 6.dp)
+                        )
                     }
                 }
             }

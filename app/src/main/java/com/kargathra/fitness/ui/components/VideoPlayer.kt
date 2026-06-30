@@ -15,29 +15,38 @@ import androidx.compose.ui.viewinterop.AndroidView
 
 /**
  * Plays a short looping demo clip bundled in res/raw, using the platform
- * VideoView (no extra dependency). Muted, autoplay, loops continuously.
+ * VideoView. Muted, autoplay, loops. The frame sizes itself to the video's
+ * real aspect ratio once known, so portrait and landscape both fit with no
+ * empty bands. Renders nothing if no matching resource exists.
  *
- * The frame sizes itself to the video's real aspect ratio once known, so
- * portrait clips stay tall and landscape clips stay wide — no empty bands.
- * Renders nothing if the resource is absent.
+ * Resource lookup: prefer the name derived from [videoUrl]; if that's blank
+ * (e.g. hand-authored punch bag exercises), fall back to vid_<fallbackId>.
  */
 @Composable
-fun ExerciseVideo(videoUrl: String, modifier: Modifier = Modifier) {
+fun ExerciseVideo(
+    videoUrl: String,
+    fallbackId: String = "",
+    modifier: Modifier = Modifier
+) {
     val context = LocalContext.current
 
-    val resName = remember(videoUrl) { rawResNameFor(videoUrl) }
+    val resName = remember(videoUrl, fallbackId) {
+        val fromUrl = rawResNameFor(videoUrl)
+        if (fromUrl.isNotEmpty()) fromUrl
+        else if (fallbackId.isNotEmpty()) "vid_${sanitiseResName(fallbackId)}"
+        else ""
+    }
     val resId = remember(resName) {
         if (resName.isEmpty()) 0
         else context.resources.getIdentifier(resName, "raw", context.packageName)
     }
 
-    if (resId == 0) return  // no bundled video for this exercise
+    if (resId == 0) return
 
     val videoUri = remember(resId) {
         android.net.Uri.parse("android.resource://${context.packageName}/$resId")
     }
 
-    // Default to portrait until the real ratio is known; updated on prepare.
     var aspect by remember(resId) { mutableFloatStateOf(9f / 16f) }
 
     AndroidView(
@@ -49,7 +58,7 @@ fun ExerciseVideo(videoUrl: String, modifier: Modifier = Modifier) {
                 setVideoURI(videoUri)
                 setOnPreparedListener { mp: MediaPlayer ->
                     mp.isLooping = true
-                    mp.setVolume(0f, 0f)   // muted
+                    mp.setVolume(0f, 0f)
                     val w = mp.videoWidth
                     val h = mp.videoHeight
                     if (w > 0 && h > 0) aspect = w.toFloat() / h.toFloat()
@@ -61,19 +70,18 @@ fun ExerciseVideo(videoUrl: String, modifier: Modifier = Modifier) {
     )
 }
 
-/**
- * Converts a CDN video URL into the sanitised raw-resource name we bundle under.
- *   ".../Close-Grip_Barbell_Bench_Press.mp4" -> "vid_close_grip_barbell_bench_press"
- */
+/** CDN video URL -> sanitised raw-resource name (e.g. vid_barbell_back_squat). */
 fun rawResNameFor(videoUrl: String): String {
     if (videoUrl.isBlank()) return ""
     val file = videoUrl.substringAfterLast('/').substringBeforeLast('.')
     if (file.isBlank()) return ""
-    val sanitised = file
-        .lowercase()
-        .replace("-", "_")
-        .replace(Regex("[^a-z0-9_]"), "_")
-        .replace(Regex("_+"), "_")
-        .trim('_')
-    return "vid_$sanitised"
+    return "vid_${sanitiseResName(file)}"
 }
+
+/** Sanitise an arbitrary string into a valid raw-resource name fragment. */
+fun sanitiseResName(s: String): String = s
+    .lowercase()
+    .replace("-", "_")
+    .replace(Regex("[^a-z0-9_]"), "_")
+    .replace(Regex("_+"), "_")
+    .trim('_')

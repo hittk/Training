@@ -52,6 +52,9 @@ interface ExerciseDao {
     @Query("SELECT * FROM exercises WHERE id = :id")
     suspend fun getById(id: String): ExerciseEntity?
 
+    @Query("SELECT * FROM exercises WHERE name = :name COLLATE NOCASE LIMIT 1")
+    suspend fun findByName(name: String): ExerciseEntity?
+
     /** All distinct equipment values present in the cache */
     @Query("SELECT DISTINCT equipment FROM exercises WHERE equipment != '' ORDER BY equipment")
     fun equipmentList(): Flow<List<String>>

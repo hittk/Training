@@ -113,6 +113,8 @@ class ExerciseRepository(
 
     suspend fun getById(id: String): ExerciseEntity? = dao.getById(id)
 
+    suspend fun findByName(name: String): ExerciseEntity? = dao.findByName(name.trim())
+
     /** One exercise per movement family, compound-first — used by the local generator. */
     suspend fun generatorLibrary(includePunchBag: Boolean = false): List<ExerciseEntity> =
         dao.generatorLibrary(includePunchBag = includePunchBag)
