@@ -216,16 +216,17 @@ private fun ExerciseDetailSheet(
         sheetState       = sheetState,
         containerColor   = MaterialTheme.colorScheme.surface
     ) {
+        // computed here (composable context) — not inside the LazyColumn builder
+        val hasBundledById = remember(ex.id) {
+            ctx.resources.getIdentifier(
+                "vid_${sanitiseResName(ex.id)}", "raw", ctx.packageName
+            ) != 0
+        }
         LazyColumn(
             contentPadding = PaddingValues(horizontal = 24.dp, vertical = 16.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp),
             modifier = Modifier.fillMaxWidth()
         ) {
-            val hasBundledById = remember(ex.id) {
-                ctx.resources.getIdentifier(
-                    "vid_${sanitiseResName(ex.id)}", "raw", ctx.packageName
-                ) != 0
-            }
             if (ex.videoUrl.isNotEmpty() || hasBundledById) {
                 item {
                     ExerciseVideo(
