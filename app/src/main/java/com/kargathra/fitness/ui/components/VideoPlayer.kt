@@ -62,6 +62,9 @@ fun ExerciseVideo(
 
     if (videoUri == null) return
 
+    // User-uploaded videos play with sound; bundled demo loops stay muted.
+    val muted = userUri == null
+
     var aspect by remember(videoUri) { mutableFloatStateOf(9f / 16f) }
 
     AndroidView(
@@ -73,7 +76,8 @@ fun ExerciseVideo(
                 setVideoURI(videoUri)
                 setOnPreparedListener { mp: MediaPlayer ->
                     mp.isLooping = true
-                    mp.setVolume(0f, 0f)
+                    val vol = if (muted) 0f else 1f
+                    mp.setVolume(vol, vol)
                     val w = mp.videoWidth
                     val h = mp.videoHeight
                     if (w > 0 && h > 0) aspect = w.toFloat() / h.toFloat()

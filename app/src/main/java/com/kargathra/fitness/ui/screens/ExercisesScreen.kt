@@ -185,7 +185,7 @@ private fun ExerciseCard(ex: ExerciseEntity, onClick: () -> Unit) {
                     )
                 }
             }
-            if (ex.videoUrl.isNotEmpty()) {
+            if (hasAnyVideo(ex.videoUrl, ex.id)) {
                 Icon(
                     Icons.Outlined.FitnessCenter,
                     contentDescription = "Video available",
