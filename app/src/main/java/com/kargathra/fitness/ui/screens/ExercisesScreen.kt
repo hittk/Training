@@ -36,6 +36,12 @@ import com.kargathra.fitness.data.repo.ExerciseRepository
 import com.kargathra.fitness.data.repo.FavouriteRepository
 import com.kargathra.fitness.ui.components.KCard
 import com.kargathra.fitness.data.anatomy.MuscleMap
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.runtime.mutableIntStateOf
+import com.kargathra.fitness.data.video.UserVideoStore
+import com.kargathra.fitness.ui.components.hasAnyVideo
 import com.kargathra.fitness.ui.components.ExerciseVideo
 import com.kargathra.fitness.ui.components.sanitiseResName
 import com.kargathra.fitness.ui.components.MuscleMapView
@@ -216,24 +222,43 @@ private fun ExerciseDetailSheet(
         sheetState       = sheetState,
         containerColor   = MaterialTheme.colorScheme.surface
     ) {
-        // computed here (composable context) — not inside the LazyColumn builder
-        val hasBundledById = remember(ex.id) {
-            ctx.resources.getIdentifier(
-                "vid_${sanitiseResName(ex.id)}", "raw", ctx.packageName
-            ) != 0
+        // Bumped after a successful upload to force the video to re-resolve.
+        var videoRefresh by remember(ex.id) { mutableIntStateOf(0) }
+        val videoExists = hasAnyVideo(ex.videoUrl, ex.id, videoRefresh)
+
+        // System video picker — copies the chosen clip into internal storage.
+        val pickVideo = rememberLauncherForActivityResult(
+            ActivityResultContracts.GetContent()
+        ) { uri ->
+            if (uri != null) {
+                if (UserVideoStore.save(ctx, ex.id, uri)) videoRefresh++
+            }
         }
+
         LazyColumn(
             contentPadding = PaddingValues(horizontal = 24.dp, vertical = 16.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp),
             modifier = Modifier.fillMaxWidth()
         ) {
-            if (ex.videoUrl.isNotEmpty() || hasBundledById) {
+            if (videoExists) {
                 item {
                     ExerciseVideo(
                         videoUrl   = ex.videoUrl,
                         fallbackId = ex.id,
+                        refreshKey = videoRefresh,
                         modifier   = Modifier.clip(MaterialTheme.shapes.medium)
                     )
+                }
+            } else {
+                item {
+                    OutlinedButton(
+                        onClick = { pickVideo.launch("video/*") },
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Icon(Icons.Filled.Add, contentDescription = null)
+                        Spacer(Modifier.width(8.dp))
+                        Text("Add video")
+                    }
                 }
             }
             item {
