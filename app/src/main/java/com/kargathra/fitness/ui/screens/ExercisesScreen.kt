@@ -61,6 +61,7 @@ fun ExercisesScreen(
     var equipment  by remember { mutableStateOf("") }
     var mechanic   by remember { mutableStateOf("") }
     var favsOnly   by remember { mutableStateOf(false) }
+    var region     by remember { mutableStateOf<MuscleMap.BodyRegion?>(null) }
     var detailEx   by remember { mutableStateOf<ExerciseEntity?>(null) }
 
     val exercises by repo.search(
@@ -119,14 +120,19 @@ fun ExercisesScreen(
             FilterPill("★ Favourites", favsOnly) {
                 favsOnly = !favsOnly
             }
-            FilterPill("All", !favsOnly && mechanic.isEmpty() && equipment.isEmpty()) {
-                favsOnly = false; mechanic = ""; equipment = ""
+            FilterPill("All", !favsOnly && mechanic.isEmpty() && equipment.isEmpty() && region == null) {
+                favsOnly = false; mechanic = ""; equipment = ""; region = null
             }
             FilterPill("Compound", mechanic == "compound") {
                 mechanic = if (mechanic == "compound") "" else "compound"
             }
             FilterPill("Isolation", mechanic == "isolation") {
                 mechanic = if (mechanic == "isolation") "" else "isolation"
+            }
+            MuscleMap.BodyRegion.entries.forEach { r ->
+                FilterPill(r.label, region == r) {
+                    region = if (region == r) null else r
+                }
             }
             equipmentOptions.forEach { eq ->
                 FilterPill(eq.replaceFirstChar { it.uppercase() }, equipment == eq) {
@@ -140,7 +146,14 @@ fun ExercisesScreen(
 
         // ── Exercise list ──────────────────────────────────────────────────────
         val favSet = favouriteIds.toSet()
-        val shown = if (favsOnly) exercises.filter { it.id in favSet } else exercises
+        val shown = exercises
+            .let { if (favsOnly) it.filter { ex -> ex.id in favSet } else it }
+            .let { list ->
+                val r = region
+                if (r != null) list.filter { ex ->
+                    MuscleMap.inRegion(ex.primaryMuscles.splitPipe(), r)
+                } else list
+            }
         if (shown.isEmpty()) {
             EmptyState()
         } else {

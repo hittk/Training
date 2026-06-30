@@ -96,4 +96,29 @@ object MuscleMap {
     /** Show the back view only if a back-specific group is engaged. */
     fun needsBack(groups: Set<String>): Boolean =
         groups.any { it in backOnly }
+
+    /** Coarse body regions for the exercise list filter. */
+    enum class BodyRegion(val label: String) {
+        CHEST("Chest"), CORE("Core"), ARMS("Arms"), LEGS("Legs")
+    }
+
+    private val regionGroups: Map<BodyRegion, Set<String>> = mapOf(
+        BodyRegion.CHEST to setOf("chest", "shoulder", "trap"),
+        BodyRegion.CORE  to setOf("abs", "obliques", "lats", "lowerback"),
+        BodyRegion.ARMS  to setOf("biceps", "triceps", "forearm"),
+        BodyRegion.LEGS  to setOf("quads", "hamstrings", "glutes", "calves")
+    )
+
+    private val neckNames = setOf("sternocleidomastoid", "neck extensors")
+
+    /** True if an exercise (by primary muscle names) belongs to [region]. Neck counts as Chest. */
+    fun inRegion(primaryMuscles: List<String>, region: BodyRegion): Boolean {
+        val groups = regionGroups[region] ?: return false
+        return primaryMuscles.any { raw ->
+            val g = groupFor(raw)
+            (g != null && g in groups) ||
+            (region == BodyRegion.CHEST && raw.trim().lowercase() in neckNames)
+        }
+    }
+
 }
