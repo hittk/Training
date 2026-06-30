@@ -25,7 +25,9 @@ import com.kargathra.fitness.data.db.ExerciseEntity
 import com.kargathra.fitness.data.db.splitPipe
 import com.kargathra.fitness.data.repo.ExerciseRepository
 import com.kargathra.fitness.ui.components.KCard
+import com.kargathra.fitness.data.anatomy.MuscleMap
 import com.kargathra.fitness.ui.components.ExerciseVideo
+import com.kargathra.fitness.ui.components.MuscleMapView
 import com.kargathra.fitness.ui.components.SectionLabel
 import com.kargathra.fitness.ui.components.Tag
 import com.kargathra.fitness.ui.theme.Gold
@@ -216,7 +218,20 @@ private fun ExerciseDetailSheet(ex: ExerciseEntity, onDismiss: () -> Unit) {
             val secondary = ex.secondaryMuscles.splitPipe()
             if (primary.isNotEmpty()) {
                 item {
-                    SectionLabel("Muscles")
+                    SectionLabel("Muscles worked")
+                    val engagement = MuscleMap.engagementFor(primary, secondary)
+                    val groups = engagement.keys
+                    val wantFront = MuscleMap.needsFront(groups)
+                    val wantBack  = MuscleMap.needsBack(groups)
+                    MuscleMapView(
+                        engagement = engagement,
+                        // default to front if nothing mapped, so the figure is never blank
+                        showFront  = wantFront || !wantBack,
+                        showBack   = wantBack,
+                        modifier   = Modifier.padding(vertical = 8.dp)
+                    )
+                }
+                item {
                     Text("Primary: ${primary.joinToString(", ")}",
                         style = MaterialTheme.typography.bodyMedium)
                     if (secondary.isNotEmpty()) {
