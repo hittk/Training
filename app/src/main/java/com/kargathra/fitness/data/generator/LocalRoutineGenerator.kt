@@ -72,8 +72,9 @@ object LocalRoutineGenerator {
     /** Equipment strings (from the cache) the user can actually use. */
     private val ownedEquipment = setOf(
         "barbell", "dumbbell", "body only", "kettlebell",
-        "medicine ball", "machine", "other"
-        // note: battle ropes / sled / assault bike / jump rope / plyo box excluded —
+        "medicine ball", "machine", "other", "punching bag"
+        // "punching bag" gated separately by the includePunchBag flag below;
+        // battle ropes / sled / assault bike / jump rope / plyo box excluded —
         // user doesn't own these; conditioning still covered by body-only options
     )
 
