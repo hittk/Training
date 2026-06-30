@@ -110,7 +110,7 @@ fun ExercisesScreen(
                 .padding(horizontal = 20.dp, vertical = 12.dp)
         )
 
-        // ── Filter chips ───────────────────────────────────────────────────────
+        // ── Filter chips: type / favourites ──────────────────────────────────
         Row(
             Modifier
                 .horizontalScroll(rememberScrollState())
@@ -129,11 +129,33 @@ fun ExercisesScreen(
             FilterPill("Isolation", mechanic == "isolation") {
                 mechanic = if (mechanic == "isolation") "" else "isolation"
             }
+        }
+
+        Spacer(Modifier.height(8.dp))
+
+        // ── Body region row ──────────────────────────────────────────────────
+        Row(
+            Modifier
+                .horizontalScroll(rememberScrollState())
+                .padding(horizontal = 20.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
             MuscleMap.BodyRegion.entries.forEach { r ->
                 FilterPill(r.label, region == r) {
                     region = if (region == r) null else r
                 }
             }
+        }
+
+        Spacer(Modifier.height(8.dp))
+
+        // ── Equipment row ────────────────────────────────────────────────────
+        Row(
+            Modifier
+                .horizontalScroll(rememberScrollState())
+                .padding(horizontal = 20.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
             equipmentOptions.forEach { eq ->
                 FilterPill(eq.replaceFirstChar { it.uppercase() }, equipment == eq) {
                     equipment = if (equipment == eq) "" else eq
