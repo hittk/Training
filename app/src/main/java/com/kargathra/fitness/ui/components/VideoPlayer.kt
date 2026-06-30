@@ -5,27 +5,26 @@ import android.widget.VideoView
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.viewinterop.AndroidView
-import com.kargathra.fitness.ui.theme.NavyLine
 
 /**
  * Plays a short looping demo clip bundled in res/raw, using the platform
- * VideoView (no extra dependency). Muted, autoplay, loops continuously —
- * suited to 4-second exercise demos. Renders nothing if the resource is absent.
+ * VideoView (no extra dependency). Muted, autoplay, loops continuously.
  *
- * @param videoUrl the cached CDN url, e.g. ".../Barbell_Back_Squat.mp4".
- *                 We derive the local raw resource name from its filename.
+ * The frame sizes itself to the video's real aspect ratio once known, so
+ * portrait clips stay tall and landscape clips stay wide — no empty bands.
+ * Renders nothing if the resource is absent.
  */
 @Composable
 fun ExerciseVideo(videoUrl: String, modifier: Modifier = Modifier) {
     val context = LocalContext.current
 
-    // Derive raw resource name from the URL filename:
-    // "Barbell_Back_Squat.mp4" -> "vid_barbell_back_squat"
     val resName = remember(videoUrl) { rawResNameFor(videoUrl) }
     val resId = remember(resName) {
         if (resName.isEmpty()) 0
@@ -38,16 +37,22 @@ fun ExerciseVideo(videoUrl: String, modifier: Modifier = Modifier) {
         android.net.Uri.parse("android.resource://${context.packageName}/$resId")
     }
 
+    // Default to portrait until the real ratio is known; updated on prepare.
+    var aspect by remember(resId) { mutableFloatStateOf(9f / 16f) }
+
     AndroidView(
         modifier = modifier
             .fillMaxWidth()
-            .aspectRatio(9f / 16f),   // portrait clips (496x864)
+            .aspectRatio(aspect),
         factory = { ctx ->
             VideoView(ctx).apply {
                 setVideoURI(videoUri)
                 setOnPreparedListener { mp: MediaPlayer ->
                     mp.isLooping = true
                     mp.setVolume(0f, 0f)   // muted
+                    val w = mp.videoWidth
+                    val h = mp.videoHeight
+                    if (w > 0 && h > 0) aspect = w.toFloat() / h.toFloat()
                     start()
                 }
             }
@@ -58,9 +63,7 @@ fun ExerciseVideo(videoUrl: String, modifier: Modifier = Modifier) {
 
 /**
  * Converts a CDN video URL into the sanitised raw-resource name we bundle under.
- * Android raw names must be lowercase, digits/underscore only.
  *   ".../Close-Grip_Barbell_Bench_Press.mp4" -> "vid_close_grip_barbell_bench_press"
- *   ""                                        -> ""
  */
 fun rawResNameFor(videoUrl: String): String {
     if (videoUrl.isBlank()) return ""
