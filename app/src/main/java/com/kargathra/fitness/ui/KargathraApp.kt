@@ -197,7 +197,8 @@ fun KargathraApp(
                 val routine = if (rid == activeRoutine.id) activeRoutine
                               else SampleData.routineById(rid) ?: activeRoutine
                 LogWorkoutScreen(
-                    repo      = repo,
+                    repo         = repo,
+                    exerciseRepo = exerciseRepo,
                     workoutId = wid,
                     routine   = routine,
                     onFinish  = {

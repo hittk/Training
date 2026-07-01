@@ -15,6 +15,7 @@ import androidx.compose.material.icons.filled.Timer
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
@@ -22,6 +23,11 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.kargathra.fitness.data.db.SetEntity
 import com.kargathra.fitness.data.model.Exercise
 import com.kargathra.fitness.data.model.Routine
+import com.kargathra.fitness.data.repo.ExerciseRepository
+import com.kargathra.fitness.data.db.ExerciseEntity
+import com.kargathra.fitness.ui.components.ExerciseVideo
+import com.kargathra.fitness.ui.components.hasAnyVideo
+import androidx.compose.material.icons.outlined.Info
 import com.kargathra.fitness.data.repo.WorkoutRepository
 import com.kargathra.fitness.ui.components.KCard
 import com.kargathra.fitness.ui.components.SectionLabel
@@ -32,6 +38,7 @@ import kotlinx.coroutines.launch
 @Composable
 fun LogWorkoutScreen(
     repo: WorkoutRepository,
+    exerciseRepo: ExerciseRepository,
     workoutId: Long,
     routine: Routine,
     onFinish: () -> Unit,
@@ -114,6 +121,7 @@ fun LogWorkoutScreen(
                 target     = "${item.sets} × ${item.repTarget.first}–${item.repTarget.last}",
                 logged     = logged,
                 personalBest = pb,
+                exerciseRepo = exerciseRepo,
                 onAdd      = { w, r ->
                     scope.launch {
                         repo.addSet(workoutId, exercise, w, r)
@@ -197,17 +205,41 @@ private fun ExerciseLogCard(
     target: String,
     logged: List<SetEntity>,
     personalBest: SetEntity?,
+    exerciseRepo: ExerciseRepository,
     onAdd: (Double, Int) -> Unit,
     onDelete: (SetEntity) -> Unit
 ) {
+    var showInfo by remember { mutableStateOf(false) }
     KCard {
-        Text(exercise.name, style = MaterialTheme.typography.titleLarge)
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text(
+                exercise.name,
+                style = MaterialTheme.typography.titleLarge,
+                modifier = Modifier.weight(1f)
+            )
+            IconButton(onClick = { showInfo = true }) {
+                Icon(
+                    Icons.Outlined.Info,
+                    contentDescription = "Exercise details",
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        }
         Text(
             "Target: $target reps",
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.padding(top = 2.dp)
         )
+
+        if (showInfo) {
+            ExerciseInfoDialog(
+                exercise = exercise,
+                target = target,
+                exerciseRepo = exerciseRepo,
+                onDismiss = { showInfo = false }
+            )
+        }
 
         // Progressive overload suggestion
         if (personalBest != null) {
@@ -357,3 +389,68 @@ private fun Stepper(
 internal fun fmt(v: Double): String =
     if (v % 1.0 == 0.0) v.toLong().toString()
     else (Math.round(v * 100) / 100.0).toString()
+
+@Composable
+private fun ExerciseInfoDialog(
+    exercise: Exercise,
+    target: String,
+    exerciseRepo: ExerciseRepository,
+    onDismiss: () -> Unit
+) {
+    // Try to resolve the full library entry by id (works for exercises added
+    // from the Exercises tab; preset/generated ids may not match the library).
+    var entity by remember(exercise.id) { mutableStateOf<ExerciseEntity?>(null) }
+    LaunchedEffect(exercise.id) { entity = exerciseRepo.getById(exercise.id) }
+
+    val instructions: List<String> = entity?.instructions
+        ?.split("|")?.map { it.trim() }?.filter { it.isNotEmpty() }
+        ?: exercise.cues
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        confirmButton = { TextButton(onClick = onDismiss) { Text("Close") } },
+        title = { Text(exercise.name) },
+        text = {
+            Column(
+                Modifier.verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                Text("Target: $target reps",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant)
+
+                // Video, if one exists (library url or bundled/user clip)
+                val vUrl = entity?.videoUrl ?: ""
+                if (hasAnyVideo(vUrl, exercise.id)) {
+                    ExerciseVideo(
+                        videoUrl = vUrl,
+                        fallbackId = exercise.id,
+                        modifier = Modifier.clip(MaterialTheme.shapes.medium)
+                    )
+                }
+
+                // How to perform
+                if (instructions.isNotEmpty()) {
+                    Text("How to perform",
+                        style = MaterialTheme.typography.titleSmall)
+                    instructions.forEachIndexed { i, step ->
+                        Text("${i + 1}. $step",
+                            style = MaterialTheme.typography.bodyMedium)
+                    }
+                } else {
+                    Text("No detailed instructions available for this exercise.",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+
+                // Tips if available
+                val tips = entity?.exerciseTips
+                    ?.split("|")?.map { it.trim() }?.filter { it.isNotEmpty() } ?: emptyList()
+                if (tips.isNotEmpty()) {
+                    Text("Tips", style = MaterialTheme.typography.titleSmall)
+                    tips.forEach { Text("• $it", style = MaterialTheme.typography.bodyMedium) }
+                }
+            }
+        }
+    )
+}
