@@ -157,4 +157,18 @@ object MuscleMap {
         }.filterValues { it != Engagement.NONE }
     }
 
+
+    /**
+     * Convenience: fold a list of (MuscleGroup, volume) into a graded engagement
+     * map keyed by SVG group. Used by both the weekly volume chart and the
+     * session summary so the volume->figure logic lives in one place.
+     */
+    fun engagementFromGroupVolumes(volumes: List<Pair<com.kargathra.fitness.data.model.MuscleGroup, Double>>): Map<String, Engagement> {
+        val bySvg = HashMap<String, Double>()
+        volumes.forEach { (group, vol) ->
+            svgGroupsFor(group).forEach { g -> bySvg[g] = (bySvg[g] ?: 0.0) + vol }
+        }
+        return engagementByVolume(bySvg)
+    }
+
 }

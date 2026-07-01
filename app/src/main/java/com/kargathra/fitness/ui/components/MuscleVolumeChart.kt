@@ -41,17 +41,8 @@ fun MuscleVolumeChart(
         Spacer(Modifier.height(14.dp))
 
         // Visual: shade the body by relative volume worked this week.
-        val volBySvgGroup = remember(volumes) {
-            val m = HashMap<String, Double>()
-            volumes.forEach { mv ->
-                MuscleMap.svgGroupsFor(mv.group).forEach { g ->
-                    m[g] = (m[g] ?: 0.0) + mv.volumeKg
-                }
-            }
-            m
-        }
-        val engagement = remember(volBySvgGroup) {
-            MuscleMap.engagementByVolume(volBySvgGroup)
+        val engagement = remember(volumes) {
+            MuscleMap.engagementFromGroupVolumes(volumes.map { it.group to it.volumeKg })
         }
         if (engagement.isNotEmpty()) {
             MuscleMapView(

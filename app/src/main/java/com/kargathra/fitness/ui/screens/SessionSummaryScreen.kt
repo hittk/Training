@@ -47,16 +47,9 @@ fun SessionSummaryScreen(
         Text(s.title, style = MaterialTheme.typography.titleMedium)
 
         // ── Muscles worked (visual) ────────────────────────────────────────────
-        val volBySvgGroup = remember(s) {
-            val m = HashMap<String, Double>()
-            s.muscleVolume.forEach { mv ->
-                MuscleMap.svgGroupsFor(mv.group).forEach { g ->
-                    m[g] = (m[g] ?: 0.0) + mv.volumeKg
-                }
-            }
-            m
+        val engagement = remember(s) {
+            MuscleMap.engagementFromGroupVolumes(s.muscleVolume.map { it.group to it.volumeKg })
         }
-        val engagement = remember(volBySvgGroup) { MuscleMap.engagementByVolume(volBySvgGroup) }
         if (engagement.isNotEmpty()) {
             KCard {
                 SectionLabel("Muscles worked")

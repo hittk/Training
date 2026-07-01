@@ -5,7 +5,7 @@ import androidx.room.Index
 import androidx.room.PrimaryKey
 
 /**
- * Cached exercise from exerciseapi.dev.
+ * A bundled exercise from the local library (res/raw/exercises_cache.json).
  * All rich fields are stored as pipe-delimited strings to avoid
  * a JSON dependency in the DB layer — they're split on read.
  */
