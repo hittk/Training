@@ -14,6 +14,9 @@ interface SavedRoutineDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun upsert(routine: SavedRoutineEntity)
 
+    @Query("SELECT * FROM saved_routines WHERE id = :id LIMIT 1")
+    suspend fun getOnce(id: String): SavedRoutineEntity?
+
     @Query("DELETE FROM saved_routines WHERE id = :id")
     suspend fun delete(id: String)
 }

@@ -25,6 +25,51 @@ class SavedRoutineRepository(private val dao: SavedRoutineDao) {
 
     suspend fun delete(id: String) = dao.delete(id)
 
+    /** Create a new empty custom program; returns its id. */
+    suspend fun createEmpty(title: String): String {
+        val id = "custom_${System.currentTimeMillis()}"
+        val routine = Routine(
+            id = id, title = title, focus = emptyList(),
+            items = emptyList(), estimatedMinutes = 0, isGenerated = false
+        )
+        dao.upsert(SavedRoutineEntity(id = id, title = title, json = toJson(routine)))
+        return id
+    }
+
+    /** Add a routine item to a saved program (by id). No-op if program missing. */
+    suspend fun addItem(programId: String, item: RoutineItem) {
+        val current = load(programId) ?: return
+        val updated = current.copy(
+            items = current.items + item,
+            estimatedMinutes = estimateMinutes(current.items.size + 1)
+        )
+        dao.upsert(SavedRoutineEntity(programId, updated.title, toJson(updated)))
+    }
+
+    /** Remove the item at [index] from a saved program. */
+    suspend fun removeItemAt(programId: String, index: Int) {
+        val current = load(programId) ?: return
+        if (index !in current.items.indices) return
+        val newItems = current.items.toMutableList().apply { removeAt(index) }
+        val updated = current.copy(
+            items = newItems,
+            estimatedMinutes = estimateMinutes(newItems.size)
+        )
+        dao.upsert(SavedRoutineEntity(programId, updated.title, toJson(updated)))
+    }
+
+    /** Rename a saved program. */
+    suspend fun rename(programId: String, title: String) {
+        val current = load(programId) ?: return
+        val updated = current.copy(title = title)
+        dao.upsert(SavedRoutineEntity(programId, title, toJson(updated)))
+    }
+
+    private suspend fun load(programId: String): Routine? =
+        dao.getOnce(programId)?.let { runCatching { fromJson(it.json) }.getOrNull() }
+
+    private fun estimateMinutes(itemCount: Int): Int = itemCount * 6
+
     // ── JSON (manual, to keep the nested Routine structure intact) ────────────
 
     private fun toJson(r: Routine): String {

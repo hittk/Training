@@ -33,6 +33,9 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.kargathra.fitness.data.db.ExerciseEntity
 import com.kargathra.fitness.data.db.splitPipe
 import com.kargathra.fitness.data.repo.ExerciseRepository
+import com.kargathra.fitness.data.repo.SavedRoutineRepository
+import com.kargathra.fitness.data.model.toRoutineItem
+import com.kargathra.fitness.data.model.Routine
 import com.kargathra.fitness.data.repo.FavouriteRepository
 import com.kargathra.fitness.ui.components.KCard
 import com.kargathra.fitness.data.anatomy.MuscleMap
@@ -53,6 +56,7 @@ import com.kargathra.fitness.ui.theme.Gold
 fun ExercisesScreen(
     repo: ExerciseRepository,
     favRepo: FavouriteRepository,
+    savedRepo: SavedRoutineRepository,
     hasPunchBag: Boolean = false,
     modifier: Modifier = Modifier
 ) {
@@ -85,6 +89,7 @@ fun ExercisesScreen(
             ex = ex,
             repo = repo,
             favRepo = favRepo,
+            savedRepo = savedRepo,
             onOpenExercise = { detailEx = it },
             onDismiss = { detailEx = null }
         )
@@ -246,6 +251,7 @@ private fun ExerciseDetailSheet(
     ex: ExerciseEntity,
     repo: ExerciseRepository,
     favRepo: FavouriteRepository,
+    savedRepo: SavedRoutineRepository,
     onOpenExercise: (ExerciseEntity) -> Unit,
     onDismiss: () -> Unit
 ) {
@@ -321,6 +327,10 @@ private fun ExerciseDetailSheet(
                     if (ex.mechanic.isNotEmpty())  Tag(ex.mechanic.replaceFirstChar { it.uppercase() })
                     if (ex.level.isNotEmpty())     Tag(ex.level.replaceFirstChar { it.uppercase() })
                 }
+            }
+
+            item {
+                AddToProgramButton(ex = ex, savedRepo = savedRepo)
             }
 
             if (ex.overview.isNotEmpty()) {
@@ -496,4 +506,93 @@ private fun FilterPill(label: String, selected: Boolean, onClick: () -> Unit) {
             modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp)
         )
     }
+}
+
+@Composable
+private fun AddToProgramButton(
+    ex: ExerciseEntity,
+    savedRepo: SavedRoutineRepository
+) {
+    val scope = rememberCoroutineScope()
+    val programs by savedRepo.savedRoutines.collectAsStateWithLifecycle(emptyList())
+    var showDialog by remember { mutableStateOf(false) }
+    var confirmation by remember { mutableStateOf<String?>(null) }
+
+    OutlinedButton(
+        onClick = { showDialog = true },
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        Icon(Icons.Filled.Add, contentDescription = null)
+        Spacer(Modifier.width(8.dp))
+        Text("Add to program")
+    }
+    confirmation?.let { msg ->
+        Text(
+            msg,
+            style = MaterialTheme.typography.labelMedium,
+            color = Gold,
+            modifier = Modifier.padding(top = 6.dp)
+        )
+    }
+
+    if (showDialog) {
+        AlertDialog(
+            onDismissRequest = { showDialog = false },
+            title = { Text("Add to program") },
+            text = {
+                Column {
+                    // New program (auto-named from the exercise's region)
+                    TextButton(onClick = {
+                        scope.launch {
+                            val name = defaultProgramName(ex)
+                            val id = savedRepo.createEmpty(name)
+                            savedRepo.addItem(id, ex.toRoutineItem())
+                            confirmation = "Added to new program \"$name\""
+                            showDialog = false
+                        }
+                    }) {
+                        Icon(Icons.Filled.Add, contentDescription = null)
+                        Spacer(Modifier.width(8.dp))
+                        Text("New program")
+                    }
+                    if (programs.isNotEmpty()) {
+                        HorizontalDivider(
+                            color = MaterialTheme.colorScheme.outlineVariant,
+                            modifier = Modifier.padding(vertical = 4.dp)
+                        )
+                        programs.forEach { p ->
+                            TextButton(
+                                onClick = {
+                                    scope.launch {
+                                        savedRepo.addItem(p.id, ex.toRoutineItem())
+                                        confirmation = "Added to \"${p.title}\""
+                                        showDialog = false
+                                    }
+                                },
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Text(p.title, modifier = Modifier.fillMaxWidth())
+                            }
+                        }
+                    }
+                }
+            },
+            confirmButton = {},
+            dismissButton = { TextButton(onClick = { showDialog = false }) { Text("Cancel") } }
+        )
+    }
+}
+
+/** Auto name a new program from the exercise's primary region. */
+private fun defaultProgramName(ex: ExerciseEntity): String {
+    val first = ex.primaryMuscles.splitPipe().firstOrNull()?.lowercase() ?: ""
+    val region = when {
+        listOf("pectoralis", "deltoid", "trapezius").any { first.contains(it) } -> "Chest & Shoulders"
+        listOf("bicep", "tricep", "brachi", "forearm").any { first.contains(it) } -> "Arms"
+        listOf("latissimus", "rhomboid", "erector").any { first.contains(it) } -> "Back"
+        listOf("rectus abdominis", "oblique", "transverse").any { first.contains(it) } -> "Core"
+        listOf("quadricep", "rectus femoris", "vastus", "hamstring", "gluteus", "gastrocnemius", "soleus", "adductor").any { first.contains(it) } -> "Legs"
+        else -> "My"
+    }
+    return "$region Program"
 }

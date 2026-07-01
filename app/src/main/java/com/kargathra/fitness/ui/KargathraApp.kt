@@ -140,7 +140,10 @@ fun KargathraApp(
                         }
                     },
                     savedRoutines   = savedRoutines,
-                    onDeleteRoutine = { routine -> scope.launch { savedRepo.delete(routine.id) } }
+                    onDeleteRoutine = { routine -> scope.launch { savedRepo.delete(routine.id) } },
+                    onRenameProgram = { routine, name -> scope.launch { savedRepo.rename(routine.id, name) } },
+                    onRemoveItem    = { routine, idx -> scope.launch { savedRepo.removeItemAt(routine.id, idx) } },
+                    onCreateProgram = { scope.launch { savedRepo.createEmpty("New Program") } }
                 )
             }
 
@@ -148,6 +151,7 @@ fun KargathraApp(
                 ExercisesScreen(
                     repo        = exerciseRepo,
                     favRepo     = favRepo,
+                    savedRepo   = savedRepo,
                     hasPunchBag = hasPunchBag
                 )
             }

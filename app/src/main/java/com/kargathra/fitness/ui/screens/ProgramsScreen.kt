@@ -14,6 +14,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.kargathra.fitness.data.model.Program
+import androidx.compose.material.icons.filled.RemoveCircleOutline
+import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Delete
 import com.kargathra.fitness.data.model.Routine
 import com.kargathra.fitness.data.sample.SampleData
@@ -32,6 +34,9 @@ fun ProgramsScreen(
     onLoadRoutine: (Routine) -> Unit,
     savedRoutines: List<Routine> = emptyList(),
     onDeleteRoutine: (Routine) -> Unit = {},
+    onRenameProgram: (Routine, String) -> Unit = { _, _ -> },
+    onRemoveItem: (Routine, Int) -> Unit = { _, _ -> },
+    onCreateProgram: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     Column(
@@ -55,15 +60,36 @@ fun ProgramsScreen(
             }
         }
 
-        if (savedRoutines.isNotEmpty()) {
+        Row(
+            Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
             SectionLabel("My Programs")
+            TextButton(onClick = onCreateProgram) {
+                Icon(Icons.Filled.Add, contentDescription = null)
+                Spacer(Modifier.width(4.dp))
+                Text("New")
+            }
+        }
+        if (savedRoutines.isEmpty()) {
+            KCard {
+                Text(
+                    "No custom programs yet. Tap “New” to create one, generate a workout and save it, or add exercises from the Exercises tab.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        } else {
             KCard {
                 savedRoutines.forEachIndexed { i, routine ->
                     if (i > 0) HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
                     SavedRoutineRow(
-                        routine  = routine,
-                        onLoad   = { onLoadRoutine(routine) },
-                        onDelete = { onDeleteRoutine(routine) }
+                        routine    = routine,
+                        onLoad     = { onLoadRoutine(routine) },
+                        onDelete   = { onDeleteRoutine(routine) },
+                        onRename   = { newName -> onRenameProgram(routine, newName) },
+                        onRemoveItem = { idx -> onRemoveItem(routine, idx) }
                     )
                 }
             }
@@ -180,37 +206,120 @@ private fun RoutineRow(routine: Routine, onLoad: () -> Unit) {
 private fun SavedRoutineRow(
     routine: Routine,
     onLoad: () -> Unit,
-    onDelete: () -> Unit
+    onDelete: () -> Unit,
+    onRename: (String) -> Unit,
+    onRemoveItem: (Int) -> Unit
 ) {
+    var expanded by remember { mutableStateOf(false) }
     var confirmDelete by remember { mutableStateOf(false) }
-    Row(
-        Modifier.fillMaxWidth().padding(vertical = 8.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Column(Modifier.weight(1f)) {
-            Text(routine.title, style = MaterialTheme.typography.titleMedium)
-            Text(
-                "${routine.items.size} exercises · ~${routine.estimatedMinutes} min",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
+    var renaming by remember { mutableStateOf(false) }
+
+    Column {
+        Row(
+            Modifier.fillMaxWidth()
+                .clickable { expanded = !expanded }
+                .padding(vertical = 8.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Column(Modifier.weight(1f)) {
+                Text(routine.title, style = MaterialTheme.typography.titleMedium)
+                Text(
+                    "${routine.items.size} exercises · ~${routine.estimatedMinutes} min",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+            Icon(
+                imageVector = if (expanded) Icons.Filled.ExpandLess else Icons.Filled.ExpandMore,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.onSurfaceVariant
             )
         }
-        TextButton(onClick = onLoad) { Text("Load") }
-        IconButton(onClick = { confirmDelete = true }) {
-            Icon(Icons.Filled.Delete, contentDescription = "Delete", tint = MaterialTheme.colorScheme.error)
+
+        AnimatedVisibility(visible = expanded) {
+            Column(Modifier.padding(bottom = 8.dp), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                if (routine.items.isEmpty()) {
+                    Text(
+                        "No exercises yet — add some from the Exercises tab.",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(vertical = 4.dp)
+                    )
+                } else {
+                    routine.items.forEachIndexed { idx, item ->
+                        Row(
+                            Modifier.fillMaxWidth().padding(vertical = 2.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                "• ${item.exercise.name}",
+                                style = MaterialTheme.typography.bodyMedium,
+                                modifier = Modifier.weight(1f)
+                            )
+                            Text(
+                                "${item.sets} × ${item.repTarget.first}–${item.repTarget.last}",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                            IconButton(onClick = { onRemoveItem(idx) }, modifier = Modifier.size(32.dp)) {
+                                Icon(
+                                    Icons.Filled.RemoveCircleOutline,
+                                    contentDescription = "Remove ${item.exercise.name}",
+                                    tint = MaterialTheme.colorScheme.error,
+                                    modifier = Modifier.size(18.dp)
+                                )
+                            }
+                        }
+                    }
+                }
+
+                Spacer(Modifier.height(8.dp))
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Button(
+                        onClick = onLoad,
+                        enabled = routine.items.isNotEmpty(),
+                        modifier = Modifier.weight(1f)
+                    ) { Text("Load") }
+                    OutlinedButton(onClick = { renaming = true }) { Text("Rename") }
+                    IconButton(onClick = { confirmDelete = true }) {
+                        Icon(Icons.Filled.Delete, contentDescription = "Delete program",
+                            tint = MaterialTheme.colorScheme.error)
+                    }
+                }
+            }
         }
     }
+
     if (confirmDelete) {
         AlertDialog(
             onDismissRequest = { confirmDelete = false },
             title = { Text("Delete program?") },
             text = { Text("Remove \"${routine.title}\" from My Programs? This can't be undone.") },
-            confirmButton = {
-                TextButton(onClick = { confirmDelete = false; onDelete() }) { Text("Delete") }
+            confirmButton = { TextButton(onClick = { confirmDelete = false; onDelete() }) { Text("Delete") } },
+            dismissButton = { TextButton(onClick = { confirmDelete = false }) { Text("Cancel") } }
+        )
+    }
+
+    if (renaming) {
+        var text by remember { mutableStateOf(routine.title) }
+        AlertDialog(
+            onDismissRequest = { renaming = false },
+            title = { Text("Rename program") },
+            text = {
+                OutlinedTextField(
+                    value = text,
+                    onValueChange = { text = it },
+                    singleLine = true,
+                    label = { Text("Program name") }
+                )
             },
-            dismissButton = {
-                TextButton(onClick = { confirmDelete = false }) { Text("Cancel") }
-            }
+            confirmButton = {
+                TextButton(onClick = {
+                    if (text.isNotBlank()) onRename(text.trim())
+                    renaming = false
+                }) { Text("Save") }
+            },
+            dismissButton = { TextButton(onClick = { renaming = false }) { Text("Cancel") } }
         )
     }
 }
