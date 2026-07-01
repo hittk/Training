@@ -7,6 +7,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Modifier
 import androidx.navigation.NavDestination.Companion.hierarchy
 import androidx.navigation.NavType
@@ -20,6 +21,7 @@ import androidx.navigation.navArgument
 import com.kargathra.fitness.data.repo.ExerciseRepository
 import com.kargathra.fitness.data.backup.BackupManager
 import com.kargathra.fitness.data.db.WorkoutEntity
+import com.kargathra.fitness.ui.components.SplashVideo
 import com.kargathra.fitness.data.repo.FavouriteRepository
 import com.kargathra.fitness.data.repo.SavedRoutineRepository
 import com.kargathra.fitness.data.repo.WorkoutRepository
@@ -77,6 +79,12 @@ fun KargathraApp(
         currentRoute == GENERATOR_ROUTE -> "Build my workout"
         currentRoute?.startsWith("log") == true -> "Log workout"
         else -> Destination.bottomBar.firstOrNull { it.route == currentRoute }?.label ?: "Kargathra"
+    }
+
+    var showSplash by rememberSaveable { mutableStateOf(true) }
+    if (showSplash) {
+        SplashVideo(onDone = { showSplash = false })
+        return
     }
 
     Scaffold(
