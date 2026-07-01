@@ -53,6 +53,7 @@ class MainActivity : ComponentActivity() {
                             repo             = (application as App).repository,
                             exerciseRepo     = (application as App).exerciseRepository,
                             favRepo          = (application as App).favouriteRepository,
+                            savedRepo        = (application as App).savedRoutineRepository,
                             healthConnected  = isConnected,
                             healthStatusText = if (isConnected) "Connected"
                                               else "Available — not yet granted",

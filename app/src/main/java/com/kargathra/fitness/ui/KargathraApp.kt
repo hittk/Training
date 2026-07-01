@@ -12,12 +12,14 @@ import androidx.navigation.NavDestination.Companion.hierarchy
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import com.kargathra.fitness.ui.screens.SessionSummaryScreen
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import com.kargathra.fitness.data.repo.ExerciseRepository
 import com.kargathra.fitness.data.repo.FavouriteRepository
+import com.kargathra.fitness.data.repo.SavedRoutineRepository
 import com.kargathra.fitness.data.repo.WorkoutRepository
 import com.kargathra.fitness.data.model.Routine
 import com.kargathra.fitness.data.sample.SampleData
@@ -34,6 +36,7 @@ fun KargathraApp(
     repo: WorkoutRepository,
     exerciseRepo: ExerciseRepository,
     favRepo: FavouriteRepository,
+    savedRepo: SavedRoutineRepository,
     healthConnected: Boolean,
     healthStatusText: String,
     onConnectHealth: () -> Unit
@@ -45,6 +48,7 @@ fun KargathraApp(
 
     // Shared state
     var activeRoutine by remember { mutableStateOf<Routine>(SampleData.upperBodyDay) }
+    val savedRoutines by savedRepo.savedRoutines.collectAsStateWithLifecycle(emptyList())
     val context       = LocalContext.current
     val prefs         = remember { context.getSharedPreferences("kargathra", Context.MODE_PRIVATE) }
     var hasPunchBag   by remember { mutableStateOf(prefs.getBoolean("has_punch_bag", false)) }
@@ -134,7 +138,9 @@ fun KargathraApp(
                         nav.navigate(Destination.WORKOUT.route) {
                             popUpTo(Destination.WORKOUT.route) { inclusive = true }
                         }
-                    }
+                    },
+                    savedRoutines   = savedRoutines,
+                    onDeleteRoutine = { routine -> scope.launch { savedRepo.delete(routine.id) } }
                 )
             }
 
@@ -165,6 +171,7 @@ fun KargathraApp(
                     exerciseRepo    = exerciseRepo,
                     includePunchBag = hasPunchBag,
                     onBack          = { nav.popBackStack() },
+                    onSaveRoutine   = { routine -> scope.launch { savedRepo.save(routine) } },
                     onLoadRoutine = { routine ->
                         activeRoutine = routine
                         nav.navigate(Destination.WORKOUT.route) {

@@ -14,6 +14,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.kargathra.fitness.data.model.Program
+import androidx.compose.material.icons.filled.Delete
 import com.kargathra.fitness.data.model.Routine
 import com.kargathra.fitness.data.sample.SampleData
 import com.kargathra.fitness.ui.components.KCard
@@ -29,6 +30,8 @@ import com.kargathra.fitness.ui.components.Tag
 fun ProgramsScreen(
     onBuildWorkout: () -> Unit,
     onLoadRoutine: (Routine) -> Unit,
+    savedRoutines: List<Routine> = emptyList(),
+    onDeleteRoutine: (Routine) -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     Column(
@@ -49,6 +52,20 @@ fun ProgramsScreen(
             )
             Button(onClick = onBuildWorkout, modifier = Modifier.fillMaxWidth()) {
                 Text("Build me a workout")
+            }
+        }
+
+        if (savedRoutines.isNotEmpty()) {
+            SectionLabel("My Programs")
+            KCard {
+                savedRoutines.forEachIndexed { i, routine ->
+                    if (i > 0) HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+                    SavedRoutineRow(
+                        routine  = routine,
+                        onLoad   = { onLoadRoutine(routine) },
+                        onDelete = { onDeleteRoutine(routine) }
+                    )
+                }
             }
         }
 
@@ -156,5 +173,44 @@ private fun RoutineRow(routine: Routine, onLoad: () -> Unit) {
                 }
             }
         }
+    }
+}
+
+@Composable
+private fun SavedRoutineRow(
+    routine: Routine,
+    onLoad: () -> Unit,
+    onDelete: () -> Unit
+) {
+    var confirmDelete by remember { mutableStateOf(false) }
+    Row(
+        Modifier.fillMaxWidth().padding(vertical = 8.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Column(Modifier.weight(1f)) {
+            Text(routine.title, style = MaterialTheme.typography.titleMedium)
+            Text(
+                "${routine.items.size} exercises · ~${routine.estimatedMinutes} min",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+        TextButton(onClick = onLoad) { Text("Load") }
+        IconButton(onClick = { confirmDelete = true }) {
+            Icon(Icons.Filled.Delete, contentDescription = "Delete", tint = MaterialTheme.colorScheme.error)
+        }
+    }
+    if (confirmDelete) {
+        AlertDialog(
+            onDismissRequest = { confirmDelete = false },
+            title = { Text("Delete program?") },
+            text = { Text("Remove \"${routine.title}\" from My Programs? This can't be undone.") },
+            confirmButton = {
+                TextButton(onClick = { confirmDelete = false; onDelete() }) { Text("Delete") }
+            },
+            dismissButton = {
+                TextButton(onClick = { confirmDelete = false }) { Text("Cancel") }
+            }
+        )
     }
 }

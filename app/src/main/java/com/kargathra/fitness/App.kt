@@ -7,6 +7,7 @@ import androidx.sqlite.db.SupportSQLiteDatabase
 import com.kargathra.fitness.data.db.KargathraDatabase
 import com.kargathra.fitness.data.repo.ExerciseRepository
 import com.kargathra.fitness.data.repo.FavouriteRepository
+import com.kargathra.fitness.data.repo.SavedRoutineRepository
 import com.kargathra.fitness.data.repo.WorkoutRepository
 import com.kargathra.fitness.health.HealthConnectManager
 import kotlinx.coroutines.CoroutineScope
@@ -20,7 +21,7 @@ class App : Application() {
 
     val database: KargathraDatabase by lazy {
         Room.databaseBuilder(this, KargathraDatabase::class.java, "kargathra.db")
-            .addMigrations(MIGRATION_2_3)
+            .addMigrations(MIGRATION_2_3, MIGRATION_3_4)
             .fallbackToDestructiveMigration()  // only used for unforeseen jumps
             .build()
     }
@@ -39,6 +40,10 @@ class App : Application() {
         FavouriteRepository(database.favouriteDao())
     }
 
+    val savedRoutineRepository: SavedRoutineRepository by lazy {
+        SavedRoutineRepository(database.savedRoutineDao())
+    }
+
     override fun onCreate() {
         super.onCreate()
         // Populate the exercise library from the bundled asset on first launch.
@@ -53,6 +58,19 @@ private val MIGRATION_2_3 = object : Migration(2, 3) {
             "CREATE TABLE IF NOT EXISTS favourites (" +
             "exerciseId TEXT NOT NULL PRIMARY KEY, " +
             "addedAt INTEGER NOT NULL)"
+        )
+    }
+}
+
+/** v3 -> v4: add the saved_routines table (custom programs). */
+private val MIGRATION_3_4 = object : Migration(3, 4) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL(
+            "CREATE TABLE IF NOT EXISTS saved_routines (" +
+            "id TEXT NOT NULL PRIMARY KEY, " +
+            "title TEXT NOT NULL, " +
+            "json TEXT NOT NULL, " +
+            "savedAt INTEGER NOT NULL)"
         )
     }
 }

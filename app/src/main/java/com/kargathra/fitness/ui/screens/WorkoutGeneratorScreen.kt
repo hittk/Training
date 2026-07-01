@@ -30,6 +30,7 @@ fun WorkoutGeneratorScreen(
     includePunchBag: Boolean = false,
     onBack: () -> Unit,
     onLoadRoutine: (Routine) -> Unit,
+    onSaveRoutine: (Routine) -> Unit,
     modifier: Modifier = Modifier
 ) {
     val scope = rememberCoroutineScope()
@@ -218,6 +219,7 @@ fun WorkoutGeneratorScreen(
                             }
                         }
                         Spacer(Modifier.height(12.dp))
+                        var saved by remember(routine.id) { mutableStateOf(false) }
                         Button(
                             onClick = {
                                 onLoadRoutine(routine)
@@ -226,6 +228,14 @@ fun WorkoutGeneratorScreen(
                             modifier = Modifier.fillMaxWidth()
                         ) {
                             Text("Load onto Workout page")
+                        }
+                        Spacer(Modifier.height(8.dp))
+                        OutlinedButton(
+                            onClick = { onSaveRoutine(routine); saved = true },
+                            enabled = !saved,
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Text(if (saved) "Saved to My Programs ✓" else "Save to My Programs")
                         }
                     }
                 }
