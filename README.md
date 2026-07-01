@@ -4,7 +4,7 @@ A native Android (Kotlin / Jetpack Compose) strength-and-conditioning app with
 on-device Google Health Connect sync. Navy-and-gold identity, legibility-first.
 Fully local: no account, no cloud APIs, no keys in the APK.
 
-> **Status: 0.2.10 — feature build.** A working, navigable app with the full
+> **Status: 0.2.11 — feature build.** A working, navigable app with the full
 > local data model, a 471-exercise on-device library, set logging to a Room
 > database, native strength-trend charts, muscle-anatomy visualisation, and an
 > on-device routine generator.
