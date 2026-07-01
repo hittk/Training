@@ -24,6 +24,22 @@ data class TrendPoint(
 /** kg of volume attributed to each muscle group this week */
 data class MuscleVolume(val group: MuscleGroup, val volumeKg: Double)
 
+/** Everything the session summary screen needs. */
+data class SessionSummary(
+    val title: String,
+    val startedAt: Long,
+    val completedAt: Long?,
+    val durationMin: Long,
+    val totalSets: Int,
+    val totalReps: Int,
+    val totalVolumeKg: Double,
+    val exerciseCount: Int,
+    val avgBpm: Long?,
+    val maxBpm: Long?,
+    val activeKcal: Double?,
+    val muscleVolume: List<MuscleVolume>
+)
+
 class WorkoutRepository(
     private val dao: WorkoutDao,
     private val health: HealthConnectManager
@@ -109,6 +125,51 @@ class WorkoutRepository(
                 .map { MuscleVolume(it.key, it.value) }
                 .sortedByDescending { it.volumeKg }
         }
+    }
+
+    /** Build a one-off summary for a finished (or in-progress) workout. */
+    suspend fun sessionSummary(workoutId: Long): SessionSummary? {
+        val w = dao.getWorkout(workoutId) ?: return null
+        val sets = dao.setsForWorkoutOnce(workoutId)
+
+        val library = SampleData.allRoutines
+            .flatMap { it.items.map { i -> i.exercise } }
+            .distinctBy { it.id }
+            .associateBy { it.id }
+
+        val tally = mutableMapOf<MuscleGroup, Double>()
+        var totalReps = 0
+        var totalVol = 0.0
+        sets.forEach { s ->
+            val vol = s.weightKg * s.reps
+            totalReps += s.reps
+            totalVol += vol
+            val ex = library[s.exerciseId] ?: return@forEach
+            tally[ex.primary] = (tally[ex.primary] ?: 0.0) + vol
+            ex.secondary.forEach { mg -> tally[mg] = (tally[mg] ?: 0.0) + vol * 0.5 }
+        }
+        val muscleVol = tally.entries
+            .filter { it.key != MuscleGroup.CARDIO }
+            .map { MuscleVolume(it.key, it.value) }
+            .sortedByDescending { it.volumeKg }
+
+        val end = w.completedAt ?: System.currentTimeMillis()
+        val durationMin = ((end - w.startedAt) / 60000).coerceAtLeast(0)
+
+        return SessionSummary(
+            title = w.title,
+            startedAt = w.startedAt,
+            completedAt = w.completedAt,
+            durationMin = durationMin,
+            totalSets = sets.size,
+            totalReps = totalReps,
+            totalVolumeKg = totalVol,
+            exerciseCount = sets.map { it.exerciseId }.distinct().size,
+            avgBpm = w.avgBpm,
+            maxBpm = w.maxBpm,
+            activeKcal = w.activeKcal,
+            muscleVolume = muscleVol
+        )
     }
 
     // ── Observation ───────────────────────────────────────────────────────────

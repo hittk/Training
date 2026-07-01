@@ -11,6 +11,7 @@ import androidx.compose.ui.Modifier
 import androidx.navigation.NavDestination.Companion.hierarchy
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
+import com.kargathra.fitness.ui.screens.SessionSummaryScreen
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
@@ -189,8 +190,25 @@ fun KargathraApp(
                     workoutId = wid,
                     routine   = routine,
                     onFinish  = {
-                        nav.navigate(Destination.WORKOUT.route) {
+                        nav.navigate("summary/$wid") {
                             popUpTo(Destination.WORKOUT.route) { inclusive = false }
+                            launchSingleTop = true
+                        }
+                    }
+                )
+            }
+
+            composable(
+                "summary/{workoutId}",
+                arguments = listOf(navArgument("workoutId") { type = NavType.LongType })
+            ) { backEntry ->
+                val sid = backEntry.arguments?.getLong("workoutId") ?: 0L
+                SessionSummaryScreen(
+                    repo = repo,
+                    workoutId = sid,
+                    onDone = {
+                        nav.navigate(Destination.WORKOUT.route) {
+                            popUpTo(Destination.WORKOUT.route) { inclusive = true }
                             launchSingleTop = true
                         }
                     }

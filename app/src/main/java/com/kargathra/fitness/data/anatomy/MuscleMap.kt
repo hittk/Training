@@ -121,4 +121,40 @@ object MuscleMap {
         }
     }
 
+
+    /** Maps the coarse MuscleGroup enum onto SVG data-group id(s). */
+    fun svgGroupsFor(group: com.kargathra.fitness.data.model.MuscleGroup): Set<String> =
+        when (group) {
+            com.kargathra.fitness.data.model.MuscleGroup.CHEST      -> setOf("chest")
+            com.kargathra.fitness.data.model.MuscleGroup.UPPER_BACK -> setOf("trap")
+            com.kargathra.fitness.data.model.MuscleGroup.LATS       -> setOf("lats")
+            com.kargathra.fitness.data.model.MuscleGroup.SHOULDERS  -> setOf("shoulder")
+            com.kargathra.fitness.data.model.MuscleGroup.BICEPS     -> setOf("biceps")
+            com.kargathra.fitness.data.model.MuscleGroup.TRICEPS    -> setOf("triceps")
+            com.kargathra.fitness.data.model.MuscleGroup.QUADS      -> setOf("quads")
+            com.kargathra.fitness.data.model.MuscleGroup.HAMSTRINGS -> setOf("hamstrings")
+            com.kargathra.fitness.data.model.MuscleGroup.GLUTES     -> setOf("glutes")
+            com.kargathra.fitness.data.model.MuscleGroup.CALVES     -> setOf("calves")
+            com.kargathra.fitness.data.model.MuscleGroup.CORE       -> setOf("abs", "obliques")
+            com.kargathra.fitness.data.model.MuscleGroup.CARDIO     -> emptySet()
+        }
+
+    /**
+     * Convert a volume tally (SVG group -> volume) into graded engagement by
+     * RELATIVE volume: the biggest movers are PRIMARY (gold), mid are SECONDARY,
+     * the rest NONE. Threshold at 60% / 25% of the session's max group volume.
+     */
+    fun engagementByVolume(volumeByGroup: Map<String, Double>): Map<String, Engagement> {
+        val max = volumeByGroup.values.maxOrNull() ?: return emptyMap()
+        if (max <= 0.0) return emptyMap()
+        return volumeByGroup.mapValues { (_, v) ->
+            val frac = v / max
+            when {
+                frac >= 0.60 -> Engagement.PRIMARY
+                frac >= 0.25 -> Engagement.SECONDARY
+                else         -> Engagement.NONE
+            }
+        }.filterValues { it != Engagement.NONE }
+    }
+
 }

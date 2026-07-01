@@ -20,6 +20,9 @@ interface WorkoutDao {
     @Query("SELECT * FROM sets WHERE workoutId = :wid ORDER BY id ASC")
     fun observeSets(wid: Long): Flow<List<SetEntity>>
 
+    @Query("SELECT * FROM sets WHERE workoutId = :wid ORDER BY id ASC")
+    suspend fun setsForWorkoutOnce(wid: Long): List<SetEntity>
+
     @Query("SELECT * FROM sets WHERE exerciseId = :exId ORDER BY performedAt ASC")
     fun observeSetsForExercise(exId: String): Flow<List<SetEntity>>
 

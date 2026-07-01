@@ -15,6 +15,8 @@ import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.runtime.remember
+import com.kargathra.fitness.data.anatomy.MuscleMap
 import com.kargathra.fitness.data.repo.MuscleVolume
 import com.kargathra.fitness.ui.theme.Gold
 import com.kargathra.fitness.ui.theme.NavyLine
@@ -37,6 +39,29 @@ fun MuscleVolumeChart(
     KCard(modifier) {
         SectionLabel("This week — muscle volume")
         Spacer(Modifier.height(14.dp))
+
+        // Visual: shade the body by relative volume worked this week.
+        val volBySvgGroup = remember(volumes) {
+            val m = HashMap<String, Double>()
+            volumes.forEach { mv ->
+                MuscleMap.svgGroupsFor(mv.group).forEach { g ->
+                    m[g] = (m[g] ?: 0.0) + mv.volumeKg
+                }
+            }
+            m
+        }
+        val engagement = remember(volBySvgGroup) {
+            MuscleMap.engagementByVolume(volBySvgGroup)
+        }
+        if (engagement.isNotEmpty()) {
+            MuscleMapView(
+                engagement = engagement,
+                showFront  = MuscleMap.needsFront(engagement.keys),
+                showBack   = MuscleMap.needsBack(engagement.keys),
+                modifier   = Modifier.fillMaxWidth()
+            )
+            Spacer(Modifier.height(14.dp))
+        }
 
         val barHeight    = 22.dp
         val rowSpacing   = 10.dp
