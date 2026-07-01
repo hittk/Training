@@ -114,6 +114,3 @@ private fun StatRow(label: String, value: String) {
         Text(value, style = MaterialTheme.typography.titleMedium)
     }
 }
-
-private fun fmt(v: Double): String =
-    if (v == v.toLong().toDouble()) v.toLong().toString() else String.format("%.1f", v)
