@@ -21,7 +21,7 @@ class App : Application() {
 
     val database: KargathraDatabase by lazy {
         Room.databaseBuilder(this, KargathraDatabase::class.java, "kargathra.db")
-            .addMigrations(MIGRATION_2_3, MIGRATION_3_4)
+            .addMigrations(MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5)
             .fallbackToDestructiveMigration()  // only used for unforeseen jumps
             .build()
     }
@@ -29,7 +29,7 @@ class App : Application() {
     val healthConnect: HealthConnectManager by lazy { HealthConnectManager(this) }
 
     val repository: WorkoutRepository by lazy {
-        WorkoutRepository(database.workoutDao(), healthConnect)
+        WorkoutRepository(database.workoutDao(), healthConnect, database.exerciseDao())
     }
 
     val exerciseRepository: ExerciseRepository by lazy {
@@ -48,6 +48,29 @@ class App : Application() {
         super.onCreate()
         // Populate the exercise library from the bundled asset on first launch.
         appScope.launch { exerciseRepository.ensureLoaded() }
+    }
+}
+
+/** v4 -> v5: remap legacy preset exercise ids in logged sets to library ids. */
+private val MIGRATION_4_5 = object : Migration(4, 5) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        val remap = mapOf(
+            "bb_bench" to "Barbell_Bench_Press_-_Medium_Grip",
+            "incline_db_press" to "Incline_Dumbbell_Press",
+            "db_row" to "Dumbbell_Single_Arm_Row_On_Bench",
+            "db_shoulder_press" to "Dumbbell_Shoulder_Press",
+            "preacher_curl" to "Barbell_Preacher_Curl_Seated",
+            "db_rdl" to "Dumbbell_Romanian_Deadlift",
+            "bulgarian_split" to "Bulgarian_Split_Squat",
+            "goblet_squat" to "Goblet_Squat",
+            "close_grip_press" to "Close-Grip_Barbell_Bench_Press",
+            "db_lateral" to "Dumbbell_Lateral_Raise",
+            "db_curl" to "Dumbbell_Bicep_Curl",
+            "calf_raise" to "Standing_Barbell_Calf_Raise"
+        )
+        remap.forEach { (old, new) ->
+            db.execSQL("UPDATE sets SET exerciseId = ? WHERE exerciseId = ?", arrayOf(new, old))
+        }
     }
 }
 

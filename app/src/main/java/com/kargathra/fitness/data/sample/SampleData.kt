@@ -14,7 +14,7 @@ object SampleData {
     // ── Exercise library ──────────────────────────────────────────────────────
 
     val bbBench = Exercise(
-        id = "bb_bench", name = "Barbell Bench Press",
+        id = "Barbell_Bench_Press_-_Medium_Grip", name = "Barbell Bench Press",
         primary = MuscleGroup.CHEST,
         secondary = listOf(MuscleGroup.TRICEPS, MuscleGroup.SHOULDERS),
         equipment = listOf(Equipment.BARBELL, Equipment.FLAT_BENCH),
@@ -24,7 +24,7 @@ object SampleData {
             "Bar to lower chest, elbows ~45°", "Drive feet into the floor")
     )
     val inclineDbPress = Exercise(
-        id = "incline_db_press", name = "Incline Dumbbell Press",
+        id = "Incline_Dumbbell_Press", name = "Incline Dumbbell Press",
         primary = MuscleGroup.CHEST,
         secondary = listOf(MuscleGroup.SHOULDERS, MuscleGroup.TRICEPS),
         equipment = listOf(Equipment.DUMBBELL, Equipment.INCLINE_BENCH),
@@ -32,7 +32,7 @@ object SampleData {
         cues = listOf("Bench at 30°", "Lower under control to upper chest")
     )
     val dbRow = Exercise(
-        id = "db_row", name = "Single-Arm Dumbbell Row",
+        id = "Dumbbell_Single_Arm_Row_On_Bench", name = "Single-Arm Dumbbell Row",
         primary = MuscleGroup.LATS,
         secondary = listOf(MuscleGroup.UPPER_BACK, MuscleGroup.BICEPS),
         equipment = listOf(Equipment.DUMBBELL, Equipment.FLAT_BENCH),
@@ -40,7 +40,7 @@ object SampleData {
         cues = listOf("Drive elbow to hip", "No torso rotation")
     )
     val dbShoulderPress = Exercise(
-        id = "db_shoulder_press", name = "Seated Dumbbell Shoulder Press",
+        id = "Dumbbell_Shoulder_Press", name = "Seated Dumbbell Shoulder Press",
         primary = MuscleGroup.SHOULDERS,
         secondary = listOf(MuscleGroup.TRICEPS),
         equipment = listOf(Equipment.DUMBBELL, Equipment.INCLINE_BENCH),
@@ -48,7 +48,7 @@ object SampleData {
         cues = listOf("Bench upright", "Stop at ear height on the way down")
     )
     val preacherCurl = Exercise(
-        id = "preacher_curl", name = "Barbell Preacher Curl",
+        id = "Barbell_Preacher_Curl_Seated", name = "Barbell Preacher Curl",
         primary = MuscleGroup.BICEPS,
         equipment = listOf(Equipment.PREACHER_STATION, Equipment.BARBELL),
         mechanic = Mechanic.ISOLATION, pattern = Pattern.CURL,
@@ -56,7 +56,7 @@ object SampleData {
         cues = listOf("Upper arms flat on pad", "Full stretch at the bottom")
     )
     val dbRdl = Exercise(
-        id = "db_rdl", name = "Dumbbell Romanian Deadlift",
+        id = "Dumbbell_Romanian_Deadlift", name = "Dumbbell Romanian Deadlift",
         primary = MuscleGroup.HAMSTRINGS,
         secondary = listOf(MuscleGroup.GLUTES),
         equipment = listOf(Equipment.DUMBBELL),
@@ -65,7 +65,7 @@ object SampleData {
         cues = listOf("Hips back, soft knees", "Dumbbells track the shins")
     )
     val bulgarianSplit = Exercise(
-        id = "bulgarian_split", name = "Bulgarian Split Squat",
+        id = "Bulgarian_Split_Squat", name = "Bulgarian Split Squat",
         primary = MuscleGroup.QUADS,
         secondary = listOf(MuscleGroup.GLUTES),
         equipment = listOf(Equipment.DUMBBELL, Equipment.FLAT_BENCH),
@@ -73,7 +73,7 @@ object SampleData {
         cues = listOf("Rear foot on bench", "Front shin roughly vertical")
     )
     val gobletSquat = Exercise(
-        id = "goblet_squat", name = "Goblet Squat",
+        id = "Goblet_Squat", name = "Goblet Squat",
         primary = MuscleGroup.QUADS,
         secondary = listOf(MuscleGroup.GLUTES, MuscleGroup.CORE),
         equipment = listOf(Equipment.DUMBBELL),
@@ -106,7 +106,7 @@ object SampleData {
         cues = listOf("Incline 8–12%", "Don't hold the rails")
     )
     val closeGripPress = Exercise(
-        id = "close_grip_press", name = "Close-Grip Barbell Press",
+        id = "Close-Grip_Barbell_Bench_Press", name = "Close-Grip Barbell Press",
         primary = MuscleGroup.TRICEPS,
         secondary = listOf(MuscleGroup.CHEST),
         equipment = listOf(Equipment.BARBELL, Equipment.FLAT_BENCH),
@@ -115,7 +115,7 @@ object SampleData {
         cues = listOf("Hands shoulder-width", "Elbows tucked")
     )
     val dbLateralRaise = Exercise(
-        id = "db_lateral", name = "Dumbbell Lateral Raise",
+        id = "Dumbbell_Lateral_Raise", name = "Dumbbell Lateral Raise",
         primary = MuscleGroup.SHOULDERS,
         equipment = listOf(Equipment.DUMBBELL),
         mechanic = Mechanic.ISOLATION, pattern = Pattern.VERTICAL_PUSH,
@@ -123,7 +123,7 @@ object SampleData {
         cues = listOf("Lead with the elbows", "Slight forward lean")
     )
     val dbCurl = Exercise(
-        id = "db_curl", name = "Dumbbell Curl",
+        id = "Dumbbell_Bicep_Curl", name = "Dumbbell Curl",
         primary = MuscleGroup.BICEPS,
         equipment = listOf(Equipment.DUMBBELL),
         mechanic = Mechanic.ISOLATION, pattern = Pattern.CURL,
@@ -139,7 +139,7 @@ object SampleData {
         cues = listOf("Upper arm parallel to floor", "Squeeze at lockout")
     )
     val calfRaise = Exercise(
-        id = "calf_raise", name = "Standing Calf Raise",
+        id = "Standing_Barbell_Calf_Raise", name = "Standing Calf Raise",
         primary = MuscleGroup.CALVES,
         equipment = listOf(Equipment.BODYWEIGHT),
         mechanic = Mechanic.ISOLATION, pattern = Pattern.SQUAT,

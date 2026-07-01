@@ -6,6 +6,8 @@ import com.kargathra.fitness.data.db.WorkoutDao
 import com.kargathra.fitness.data.db.WorkoutEntity
 import com.kargathra.fitness.data.model.Exercise
 import com.kargathra.fitness.data.model.MuscleGroup
+import com.kargathra.fitness.data.db.ExerciseDao
+import com.kargathra.fitness.data.model.toModelExercise
 import com.kargathra.fitness.data.sample.SampleData
 import com.kargathra.fitness.health.HealthConnectManager
 import kotlinx.coroutines.flow.Flow
@@ -42,8 +44,19 @@ data class SessionSummary(
 
 class WorkoutRepository(
     private val dao: WorkoutDao,
-    private val health: HealthConnectManager
+    private val health: HealthConnectManager,
+    private val exerciseDao: ExerciseDao? = null
 ) {
+    /**
+     * Resolve an exerciseId to the Routine model. Tries the preset/sample set
+     * first (has curated cues), then falls back to the full 471 library via
+     * conversion — so library-added exercises count toward muscle analytics.
+     */
+    private suspend fun resolveExercise(
+        id: String,
+        sample: Map<String, Exercise>
+    ): Exercise? = sample[id] ?: exerciseDao?.getById(id)?.toModelExercise()
+
     // ── Workout lifecycle ─────────────────────────────────────────────────────
 
     suspend fun startWorkout(title: String): Long =
@@ -112,8 +125,10 @@ class WorkoutRepository(
 
         return dao.observeSetsFrom(weekStart).map { sets ->
             val tally = mutableMapOf<MuscleGroup, Double>()
+            val resolved = HashMap<String, Exercise?>()
             sets.forEach { s ->
-                val ex = library[s.exerciseId] ?: return@forEach
+                val ex = resolved.getOrPut(s.exerciseId) { resolveExercise(s.exerciseId, library) }
+                    ?: return@forEach
                 val vol = s.weightKg * s.reps
                 tally[ex.primary] = (tally[ex.primary] ?: 0.0) + vol
                 ex.secondary.forEach { mg ->
@@ -140,11 +155,13 @@ class WorkoutRepository(
         val tally = mutableMapOf<MuscleGroup, Double>()
         var totalReps = 0
         var totalVol = 0.0
+        val resolved = HashMap<String, Exercise?>()
         sets.forEach { s ->
             val vol = s.weightKg * s.reps
             totalReps += s.reps
             totalVol += vol
-            val ex = library[s.exerciseId] ?: return@forEach
+            val ex = resolved.getOrPut(s.exerciseId) { resolveExercise(s.exerciseId, library) }
+                ?: return@forEach
             tally[ex.primary] = (tally[ex.primary] ?: 0.0) + vol
             ex.secondary.forEach { mg -> tally[mg] = (tally[mg] ?: 0.0) + vol * 0.5 }
         }

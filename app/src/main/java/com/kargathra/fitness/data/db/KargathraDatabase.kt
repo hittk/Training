@@ -11,7 +11,7 @@ import androidx.room.RoomDatabase
         FavouriteEntity::class,  // added in v3
         SavedRoutineEntity::class  // added in v4
     ],
-    version = 4,
+    version = 5,
     exportSchema = false
 )
 abstract class KargathraDatabase : RoomDatabase() {

@@ -13,8 +13,8 @@ android {
         applicationId = "com.kargathra.fitness"
         minSdk = 30
         targetSdk = 36
-        versionCode = 14
-        versionName = "0.2.12"
+        versionCode = 15
+        versionName = "0.3.0"
         vectorDrawables { useSupportLibrary = true }
     }
 
