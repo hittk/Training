@@ -19,6 +19,7 @@ import com.kargathra.fitness.data.repo.TrendPoint
 import com.kargathra.fitness.data.repo.WorkoutRepository
 import com.kargathra.fitness.ui.components.KCard
 import com.kargathra.fitness.ui.components.MuscleVolumeChart
+import com.kargathra.fitness.ui.components.PlateCalculatorCard
 import com.kargathra.fitness.ui.components.SectionLabel
 import com.kargathra.fitness.ui.components.TrendChart
 import java.time.Instant
@@ -47,6 +48,9 @@ fun ProgressScreen(repo: WorkoutRepository, modifier: Modifier = Modifier) {
         modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(20.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
+        // ── Plate calculator ───────────────────────────────────────────────────
+        PlateCalculatorCard()
+
         // ── Weekly muscle volume ───────────────────────────────────────────────
         if (weeklyVolume.isNotEmpty()) {
             MuscleVolumeChart(volumes = weeklyVolume)
