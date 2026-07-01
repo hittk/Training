@@ -16,3 +16,6 @@ local.properties
 *.keystore
 captures/
 !app/debug.keystore
+
+# Node
+node_modules/
