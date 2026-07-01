@@ -81,9 +81,8 @@ fun ProgramsScreen(
                 )
             }
         } else {
-            KCard {
-                savedRoutines.forEachIndexed { i, routine ->
-                    if (i > 0) HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+            savedRoutines.forEach { routine ->
+                KCard {
                     SavedRoutineRow(
                         routine    = routine,
                         onLoad     = { onLoadRoutine(routine) },

@@ -8,7 +8,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.kargathra.fitness.data.model.Routine
-import com.kargathra.fitness.data.sample.SampleData
 import com.kargathra.fitness.ui.components.KCard
 import com.kargathra.fitness.ui.components.SectionLabel
 import com.kargathra.fitness.ui.components.Tag
@@ -20,8 +19,6 @@ import com.kargathra.fitness.ui.components.Tag
  */
 @Composable
 fun WorkoutScreen(
-    healthConnected: Boolean,
-    onConnectHealth: () -> Unit,
     activeRoutine: Routine,
     onStart: () -> Unit,
     modifier: Modifier = Modifier
@@ -49,25 +46,6 @@ fun WorkoutScreen(
             Spacer(Modifier.height(16.dp))
             Button(onClick = onStart, modifier = Modifier.fillMaxWidth()) {
                 Text("Start workout")
-            }
-        }
-
-        SectionLabel("Health Connect")
-        KCard {
-            Text(
-                if (healthConnected) "Connected" else "Not connected",
-                style = MaterialTheme.typography.titleMedium
-            )
-            Text(
-                "Logged sessions sync to Health Connect on this device, and your Fitbit's heart rate is read back over each one. Nothing is uploaded.",
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(top = 4.dp, bottom = 12.dp)
-            )
-            if (!healthConnected) {
-                OutlinedButton(onClick = onConnectHealth, modifier = Modifier.fillMaxWidth()) {
-                    Text("Grant access")
-                }
             }
         }
     }

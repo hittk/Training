@@ -16,6 +16,8 @@ import com.kargathra.fitness.ui.components.SectionLabel
 @Composable
 fun SettingsScreen(
     healthStatusText: String,
+    healthConnected: Boolean,
+    onConnectHealth: () -> Unit,
     hasPunchBag: Boolean,
     onPunchBagChange: (Boolean) -> Unit,
     exerciseCount: Int,
@@ -99,6 +101,12 @@ fun SettingsScreen(
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.padding(top = 4.dp)
             )
+            if (!healthConnected) {
+                Spacer(Modifier.height(12.dp))
+                OutlinedButton(onClick = onConnectHealth, modifier = Modifier.fillMaxWidth()) {
+                    Text("Grant access")
+                }
+            }
         }
 
         // ── About ──────────────────────────────────────────────────────────────

@@ -9,8 +9,8 @@ import androidx.compose.ui.graphics.vector.ImageVector
 
 enum class Destination(val route: String, val label: String, val icon: ImageVector) {
     WORKOUT("workout", "Workout", Icons.Outlined.PlayArrow),
-    PROGRAMS("programs", "Programs", Icons.Outlined.FitnessCenter),
-    EXERCISES("exercises", "Exercises", Icons.Outlined.GridView),
+    PROGRAMS("programs", "Programs", Icons.Outlined.GridView),
+    EXERCISES("exercises", "Exercises", Icons.Outlined.FitnessCenter),
     PROGRESS("progress", "Progress", Icons.Outlined.BarChart);
 
     companion object {

@@ -118,8 +118,6 @@ fun KargathraApp(
         ) {
             composable(Destination.WORKOUT.route) {
                 WorkoutScreen(
-                    healthConnected = healthConnected,
-                    onConnectHealth = onConnectHealth,
                     activeRoutine   = activeRoutine,
                     onStart         = {
                         scope.launch {
@@ -161,6 +159,8 @@ fun KargathraApp(
             composable(SETTINGS_ROUTE) {
                 SettingsScreen(
                     healthStatusText = healthStatusText,
+                    healthConnected  = healthConnected,
+                    onConnectHealth  = onConnectHealth,
                     hasPunchBag      = hasPunchBag,
                     onPunchBagChange = {
                         hasPunchBag = it
