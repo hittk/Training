@@ -1,5 +1,7 @@
 package com.kargathra.fitness.data.anatomy
 
+import com.kargathra.fitness.data.model.MuscleGroup
+
 
 /**
  * Maps the fine-grained anatomical muscle names in the exercise data onto the
@@ -169,6 +171,37 @@ object MuscleMap {
             svgGroupsFor(group).forEach { g -> bySvg[g] = (bySvg[g] ?: 0.0) + vol }
         }
         return engagementByVolume(bySvg)
+    }
+
+
+    /** SVG data-group id -> coarse MuscleGroup enum (single source of truth). */
+    private fun svgGroupToEnum(g: String): MuscleGroup? = when (g) {
+        "chest"              -> MuscleGroup.CHEST
+        "trap", "upper_back" -> MuscleGroup.UPPER_BACK
+        "lats"               -> MuscleGroup.LATS
+        "shoulder"           -> MuscleGroup.SHOULDERS
+        "biceps"             -> MuscleGroup.BICEPS
+        "triceps"            -> MuscleGroup.TRICEPS
+        "forearm"            -> MuscleGroup.BICEPS      // no forearm enum; fold to arms
+        "abs", "obliques"    -> MuscleGroup.CORE
+        "lowerback"          -> MuscleGroup.CORE
+        "quads"              -> MuscleGroup.QUADS
+        "hamstrings"         -> MuscleGroup.HAMSTRINGS
+        "glutes"             -> MuscleGroup.GLUTES
+        "calves"             -> MuscleGroup.CALVES
+        else                 -> null
+    }
+
+    /**
+     * THE canonical anatomical-name -> MuscleGroup mapping. Every consumer
+     * (routine generator, exercise conversion, analytics) should use this so
+     * classifications never drift apart. Routed through groupFor (the SVG map)
+     * so the figure and the enums always agree. Neck folds to shoulders.
+     */
+    fun muscleGroupFor(anatomical: String): MuscleGroup? {
+        val raw = anatomical.trim().lowercase()
+        if (raw == "sternocleidomastoid" || raw == "neck extensors") return MuscleGroup.SHOULDERS
+        return groupFor(raw)?.let { svgGroupToEnum(it) }
     }
 
 }

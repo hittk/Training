@@ -9,28 +9,6 @@ import com.kargathra.fitness.data.db.ExerciseEntity
  * MuscleGroup enum), so library exercises can be added to custom programs.
  */
 
-/** SVG data-group id -> coarse MuscleGroup enum. */
-private fun svgGroupToMuscleGroup(g: String): MuscleGroup? = when (g) {
-    "chest"                 -> MuscleGroup.CHEST
-    "trap", "upper_back"    -> MuscleGroup.UPPER_BACK
-    "lats"                  -> MuscleGroup.LATS
-    "shoulder"              -> MuscleGroup.SHOULDERS
-    "biceps"                -> MuscleGroup.BICEPS
-    "triceps"               -> MuscleGroup.TRICEPS
-    "forearm"               -> MuscleGroup.BICEPS      // no forearm enum; fold to arms
-    "abs", "obliques"       -> MuscleGroup.CORE
-    "lowerback"             -> MuscleGroup.CORE
-    "quads"                 -> MuscleGroup.QUADS
-    "hamstrings"            -> MuscleGroup.HAMSTRINGS
-    "glutes"                -> MuscleGroup.GLUTES
-    "calves"                -> MuscleGroup.CALVES
-    else                    -> null
-}
-
-/** Map one anatomical muscle name -> MuscleGroup enum (via the SVG group). */
-private fun muscleGroupForAnatomical(name: String): MuscleGroup? =
-    MuscleMap.groupFor(name)?.let { svgGroupToMuscleGroup(it) }
-
 private fun equipmentFor(entity: ExerciseEntity): List<Equipment> = when (entity.equipment.lowercase()) {
     "barbell"        -> listOf(Equipment.BARBELL)
     "dumbbell"       -> listOf(Equipment.DUMBBELL)
@@ -50,9 +28,9 @@ private fun patternFor(entity: ExerciseEntity): Pattern = when (entity.force.low
 fun ExerciseEntity.toModelExercise(): Exercise {
     val primaries = primaryMuscles.split("|").map { it.trim() }.filter { it.isNotEmpty() }
     val secondaries = secondaryMuscles.split("|").map { it.trim() }.filter { it.isNotEmpty() }
-    val primaryGroup = primaries.firstNotNullOfOrNull { muscleGroupForAnatomical(it) }
+    val primaryGroup = primaries.firstNotNullOfOrNull { MuscleMap.muscleGroupFor(it) }
         ?: MuscleGroup.CORE
-    val secondaryGroups = secondaries.mapNotNull { muscleGroupForAnatomical(it) }
+    val secondaryGroups = secondaries.mapNotNull { MuscleMap.muscleGroupFor(it) }
         .distinct().filter { it != primaryGroup }
     return Exercise(
         id = id,

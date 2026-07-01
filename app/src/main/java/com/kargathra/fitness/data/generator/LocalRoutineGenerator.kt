@@ -1,5 +1,6 @@
 package com.kargathra.fitness.data.generator
 
+import com.kargathra.fitness.data.anatomy.MuscleMap
 import com.kargathra.fitness.data.db.ExerciseEntity
 import com.kargathra.fitness.data.db.splitPipe
 import com.kargathra.fitness.data.model.*
@@ -22,45 +23,8 @@ object LocalRoutineGenerator {
 
     // ── Anatomical name → MuscleGroup mapping ─────────────────────────────────
 
-    private val muscleMap: Map<String, MuscleGroup> = buildMap {
-        // Chest
-        listOf("pectoralis major sternal head", "pectoralis major clavicular head",
-               "pectoralis minor", "pectoralis").forEach { put(it, MuscleGroup.CHEST) }
-        // Upper back
-        listOf("trapezius middle", "trapezius upper", "rhomboids", "levator scapulae",
-               "erector spinae").forEach { put(it, MuscleGroup.UPPER_BACK) }
-        // Lats
-        listOf("latissimus dorsi", "serratus anterior").forEach { put(it, MuscleGroup.LATS) }
-        // Shoulders
-        listOf("deltoid anterior", "deltoid lateral", "deltoid posterior",
-               "rotator cuff").forEach { put(it, MuscleGroup.SHOULDERS) }
-        // Biceps
-        listOf("biceps brachii short head", "biceps brachii long head", "brachialis",
-               "wrist flexors").forEach { put(it, MuscleGroup.BICEPS) }
-        // Triceps
-        listOf("triceps brachii lateral head", "triceps brachii medial head",
-               "triceps brachii long head", "wrist extensors").forEach { put(it, MuscleGroup.TRICEPS) }
-        // Quads
-        listOf("rectus femoris", "vastus lateralis", "vastus medialis", "vastus intermedius",
-               "tensor fasciae latae").forEach { put(it, MuscleGroup.QUADS) }
-        // Hamstrings
-        listOf("biceps femoris", "semitendinosus", "semimembranosus").forEach {
-            put(it, MuscleGroup.HAMSTRINGS) }
-        // Glutes
-        listOf("gluteus maximus", "gluteus medius", "gluteus minimus",
-               "adductor longus", "adductor magnus", "gracilis", "iliopsoas").forEach {
-            put(it, MuscleGroup.GLUTES) }
-        // Calves
-        listOf("gastrocnemius", "soleus").forEach { put(it, MuscleGroup.CALVES) }
-        // Core
-        listOf("rectus abdominis", "obliques external", "obliques internal",
-               "transverse abdominis").forEach { put(it, MuscleGroup.CORE) }
-        // Neck — fold into shoulders rather than dropping
-        listOf("sternocleidomastoid", "neck extensors").forEach { put(it, MuscleGroup.SHOULDERS) }
-    }
-
     private fun ExerciseEntity.muscleGroups(): List<MuscleGroup> {
-        val primary = primaryMuscles.splitPipe().mapNotNull { muscleMap[it.lowercase()] }
+        val primary = primaryMuscles.splitPipe().mapNotNull { MuscleMap.muscleGroupFor(it) }
         return if (category == "conditioning") listOf(MuscleGroup.CARDIO) else primary.distinct()
     }
 
