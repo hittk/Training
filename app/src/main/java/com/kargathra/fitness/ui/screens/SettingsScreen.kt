@@ -1,5 +1,7 @@
 package com.kargathra.fitness.ui.screens
 
+import com.kargathra.fitness.BuildConfig
+
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -104,7 +106,7 @@ fun SettingsScreen(
         KCard {
             Text("Kargathra", style = MaterialTheme.typography.titleLarge)
             Text(
-                "Version 0.1.0",
+                "Version ${BuildConfig.VERSION_NAME} (${BuildConfig.VERSION_CODE})",
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
