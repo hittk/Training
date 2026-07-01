@@ -13,7 +13,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ChevronRight
+import androidx.compose.material.icons.filled.KeyboardArrowRight
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.kargathra.fitness.data.db.ExerciseRef
 import com.kargathra.fitness.data.repo.MuscleVolume
@@ -81,7 +81,7 @@ fun ProgressScreen(
                             )
                         }
                         Icon(
-                            Icons.AutoMirrored.Filled.ChevronRight,
+                            Icons.Filled.KeyboardArrowRight,
                             contentDescription = null,
                             tint = MaterialTheme.colorScheme.onSurfaceVariant
                         )

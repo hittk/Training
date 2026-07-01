@@ -18,6 +18,8 @@ import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import com.kargathra.fitness.data.repo.ExerciseRepository
+import com.kargathra.fitness.data.backup.BackupManager
+import com.kargathra.fitness.data.db.WorkoutEntity
 import com.kargathra.fitness.data.repo.FavouriteRepository
 import com.kargathra.fitness.data.repo.SavedRoutineRepository
 import com.kargathra.fitness.data.repo.WorkoutRepository
@@ -37,6 +39,7 @@ fun KargathraApp(
     exerciseRepo: ExerciseRepository,
     favRepo: FavouriteRepository,
     savedRepo: SavedRoutineRepository,
+    backup: BackupManager,
     healthConnected: Boolean,
     healthStatusText: String,
     onConnectHealth: () -> Unit
@@ -52,6 +55,15 @@ fun KargathraApp(
     val context       = LocalContext.current
     val prefs         = remember { context.getSharedPreferences("kargathra", Context.MODE_PRIVATE) }
     var hasPunchBag   by remember { mutableStateOf(prefs.getBoolean("has_punch_bag", false)) }
+    var resumeWorkout by remember { mutableStateOf<WorkoutEntity?>(null) }
+    LaunchedEffect(Unit) {
+        val savedId = prefs.getLong("active_workout_id", -1L)
+        if (savedId > 0) {
+            val w = repo.getWorkout(savedId)
+            if (w != null && w.completedAt == null) resumeWorkout = w
+            else prefs.edit().remove("active_workout_id").remove("active_routine_json").apply()
+        }
+    }
     var exerciseCount by remember { mutableIntStateOf(0) }
 
     // Load the bundled library and report the count
@@ -122,8 +134,27 @@ fun KargathraApp(
                     onStart         = {
                         scope.launch {
                             val id = repo.startWorkout(activeRoutine.title)
+                            prefs.edit()
+                                .putLong("active_workout_id", id)
+                                .putString("active_routine_json", savedRepo.toJson(activeRoutine))
+                                .apply()
+                            resumeWorkout = null
                             nav.navigate("log/$id/${activeRoutine.id}")
                         }
+                    },
+                    resumeTitle     = resumeWorkout?.title,
+                    onResume        = {
+                        val w = resumeWorkout ?: return@WorkoutScreen
+                        prefs.getString("active_routine_json", null)?.let { json ->
+                            runCatching { savedRepo.fromJson(json) }.getOrNull()?.let { r ->
+                                activeRoutine = r
+                            }
+                        }
+                        nav.navigate("log/${w.id}/${activeRoutine.id}")
+                    },
+                    onDiscardResume = {
+                        prefs.edit().remove("active_workout_id").remove("active_routine_json").apply()
+                        resumeWorkout = null
                     }
                 )
             }
@@ -166,6 +197,7 @@ fun KargathraApp(
 
             composable(SETTINGS_ROUTE) {
                 SettingsScreen(
+                    backup           = backup,
                     healthStatusText = healthStatusText,
                     healthConnected  = healthConnected,
                     onConnectHealth  = onConnectHealth,
@@ -210,6 +242,8 @@ fun KargathraApp(
                     workoutId = wid,
                     routine   = routine,
                     onFinish  = {
+                        prefs.edit().remove("active_workout_id").remove("active_routine_json").apply()
+                        resumeWorkout = null
                         nav.navigate("summary/$wid") {
                             popUpTo(Destination.WORKOUT.route) { inclusive = false }
                             launchSingleTop = true

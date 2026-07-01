@@ -6,15 +6,22 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
-import androidx.compose.runtime.Composable
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.ui.platform.LocalContext
+import com.kargathra.fitness.data.backup.BackupManager
+import com.kargathra.fitness.ui.theme.Gold
+import kotlinx.coroutines.launch
 import com.kargathra.fitness.ui.components.KCard
 import com.kargathra.fitness.ui.components.SectionLabel
 
 @Composable
 fun SettingsScreen(
+    backup: BackupManager,
     healthStatusText: String,
     healthConnected: Boolean,
     onConnectHealth: () -> Unit,
@@ -106,6 +113,39 @@ fun SettingsScreen(
                 OutlinedButton(onClick = onConnectHealth, modifier = Modifier.fillMaxWidth()) {
                     Text("Grant access")
                 }
+            }
+        }
+
+        // ── Data ───────────────────────────────────────────────────────────────
+        SectionLabel("Data")
+        KCard {
+            val scope = rememberCoroutineScope()
+            val ctx = LocalContext.current
+            var status by remember { mutableStateOf<String?>(null) }
+            val pickBackup = rememberLauncherForActivityResult(
+                ActivityResultContracts.GetContent()
+            ) { uri ->
+                if (uri != null) scope.launch { status = backup.import(ctx, uri) }
+            }
+            Text(
+                "Everything lives on this device only. Export a backup to Downloads, or restore from one. Import adds to what's here — it never deletes.",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            Spacer(Modifier.height(12.dp))
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Button(
+                    onClick = { scope.launch { status = backup.export(ctx) } },
+                    modifier = Modifier.weight(1f)
+                ) { Text("Export backup") }
+                OutlinedButton(
+                    onClick = { pickBackup.launch("application/json") },
+                    modifier = Modifier.weight(1f)
+                ) { Text("Import") }
+            }
+            status?.let {
+                Spacer(Modifier.height(10.dp))
+                Text(it, style = MaterialTheme.typography.labelMedium, color = Gold)
             }
         }
 

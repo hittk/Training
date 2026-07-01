@@ -14,6 +14,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.kargathra.fitness.health.HealthConnectManager
+import com.kargathra.fitness.data.backup.BackupManager
 import com.kargathra.fitness.ui.KargathraApp
 import com.kargathra.fitness.ui.theme.KargathraTheme
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -54,6 +55,7 @@ class MainActivity : ComponentActivity() {
                             exerciseRepo     = (application as App).exerciseRepository,
                             favRepo          = (application as App).favouriteRepository,
                             savedRepo        = (application as App).savedRoutineRepository,
+                            backup           = BackupManager((application as App).database),
                             healthConnected  = isConnected,
                             healthStatusText = if (isConnected) "Connected"
                                               else "Available — not yet granted",

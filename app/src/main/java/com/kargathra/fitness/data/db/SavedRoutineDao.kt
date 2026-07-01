@@ -11,6 +11,9 @@ interface SavedRoutineDao {
     @Query("SELECT * FROM saved_routines ORDER BY savedAt DESC")
     fun observeAll(): Flow<List<SavedRoutineEntity>>
 
+    @Query("SELECT * FROM saved_routines ORDER BY savedAt ASC")
+    suspend fun allOnce(): List<SavedRoutineEntity>
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun upsert(routine: SavedRoutineEntity)
 

@@ -90,7 +90,7 @@ class SavedRoutineRepository(private val dao: SavedRoutineDao) {
 
     // ── JSON (manual, to keep the nested Routine structure intact) ────────────
 
-    private fun toJson(r: Routine): String {
+    fun toJson(r: Routine): String {
         val o = JSONObject()
         o.put("id", r.id)
         o.put("title", r.title)
@@ -124,7 +124,7 @@ class SavedRoutineRepository(private val dao: SavedRoutineDao) {
         return o.toString()
     }
 
-    private fun fromJson(s: String): Routine {
+    fun fromJson(s: String): Routine {
         val o = JSONObject(s)
         val focus = o.getJSONArray("focus").let { arr ->
             (0 until arr.length()).map { MuscleGroup.valueOf(arr.getString(it)) }

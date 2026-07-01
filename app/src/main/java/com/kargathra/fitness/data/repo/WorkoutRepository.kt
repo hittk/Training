@@ -194,6 +194,8 @@ class WorkoutRepository(
     fun observeWorkout(id: Long): Flow<WorkoutEntity?> = dao.observeWorkout(id)
     fun observeSets(workoutId: Long): Flow<List<SetEntity>> = dao.observeSets(workoutId)
     fun observeLoggedExercises(): Flow<List<ExerciseRef>> = dao.observeLoggedExercises()
+    suspend fun getWorkout(id: Long): WorkoutEntity? = dao.getWorkout(id)
+
     fun observeWorkouts(): Flow<List<WorkoutEntity>> = dao.observeWorkouts()
 
     // ── Trends ────────────────────────────────────────────────────────────────

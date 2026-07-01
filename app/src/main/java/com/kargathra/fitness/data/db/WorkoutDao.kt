@@ -14,6 +14,8 @@ interface WorkoutDao {
     @Query("SELECT * FROM workouts WHERE id = :id") suspend fun getWorkout(id: Long): WorkoutEntity?
     @Query("SELECT * FROM workouts WHERE id = :id") fun observeWorkout(id: Long): Flow<WorkoutEntity?>
     @Query("SELECT * FROM workouts ORDER BY startedAt DESC") fun observeWorkouts(): Flow<List<WorkoutEntity>>
+    @Query("SELECT * FROM workouts ORDER BY startedAt ASC") suspend fun allWorkouts(): List<WorkoutEntity>
+    @Query("SELECT * FROM sets ORDER BY id ASC") suspend fun allSets(): List<SetEntity>
 
     @Insert suspend fun insertSet(s: SetEntity): Long
     @Delete suspend fun deleteSet(s: SetEntity)

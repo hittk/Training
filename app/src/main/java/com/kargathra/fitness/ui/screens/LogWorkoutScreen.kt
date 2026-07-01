@@ -212,6 +212,7 @@ private fun ExerciseLogCard(
     onDelete: (SetEntity) -> Unit
 ) {
     var showInfo by remember { mutableStateOf(false) }
+    var prWeight by remember { mutableStateOf<Double?>(null) }
     KCard {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Text(
@@ -233,6 +234,15 @@ private fun ExerciseLogCard(
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.padding(top = 2.dp)
         )
+
+        prWeight?.let { w ->
+            Text(
+                "\uD83C\uDFC6 New PR \u2014 ${fmt(w)} kg! Previous best beaten.",
+                style = MaterialTheme.typography.titleSmall,
+                color = Gold,
+                modifier = Modifier.padding(top = 6.dp)
+            )
+        }
 
         if (showInfo) {
             ExerciseInfoDialog(
@@ -267,7 +277,10 @@ private fun ExerciseLogCard(
         SetEntryRow(
             initialWeight = personalBest?.weightKg ?: logged.lastOrNull()?.weightKg ?: 20.0,
             initialReps   = logged.lastOrNull()?.reps ?: exercise.repRange.first.coerceAtLeast(1),
-            onAdd         = onAdd
+            onAdd         = { w, r ->
+                if (w > (personalBest?.weightKg ?: 0.0)) prWeight = w
+                onAdd(w, r)
+            }
         )
     }
 }

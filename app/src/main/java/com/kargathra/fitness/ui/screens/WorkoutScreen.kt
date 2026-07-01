@@ -21,6 +21,9 @@ import com.kargathra.fitness.ui.components.Tag
 fun WorkoutScreen(
     activeRoutine: Routine,
     onStart: () -> Unit,
+    resumeTitle: String? = null,
+    onResume: () -> Unit = {},
+    onDiscardResume: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     Column(
@@ -30,6 +33,25 @@ fun WorkoutScreen(
             .padding(20.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
+        if (resumeTitle != null) {
+            SectionLabel("In progress")
+            KCard {
+                Text(resumeTitle, style = MaterialTheme.typography.titleMedium)
+                Text(
+                    "You have an unfinished session.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(top = 2.dp, bottom = 12.dp)
+                )
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Button(onClick = onResume, modifier = Modifier.weight(1f)) {
+                        Text("Resume")
+                    }
+                    OutlinedButton(onClick = onDiscardResume) { Text("Discard") }
+                }
+            }
+        }
+
         SectionLabel("Today's session")
         KCard {
             Text(activeRoutine.title, style = MaterialTheme.typography.headlineSmall)
