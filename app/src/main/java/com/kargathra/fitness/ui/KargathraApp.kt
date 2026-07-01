@@ -141,6 +141,9 @@ fun KargathraApp(
                     onDeleteRoutine = { routine -> scope.launch { savedRepo.delete(routine.id) } },
                     onRenameProgram = { routine, name -> scope.launch { savedRepo.rename(routine.id, name) } },
                     onRemoveItem    = { routine, idx -> scope.launch { savedRepo.removeItemAt(routine.id, idx) } },
+                    onEditItem      = { routine, idx, s, reps, rest ->
+                        scope.launch { savedRepo.updateItemAt(routine.id, idx, s, reps, rest) }
+                    },
                     onCreateProgram = { scope.launch { savedRepo.createEmpty("New Program") } }
                 )
             }
@@ -154,7 +157,12 @@ fun KargathraApp(
                 )
             }
 
-            composable(Destination.PROGRESS.route) { ProgressScreen(repo) }
+            composable(Destination.PROGRESS.route) {
+                ProgressScreen(
+                    repo = repo,
+                    onOpenSession = { id -> nav.navigate("history_summary/$id") }
+                )
+            }
 
             composable(SETTINGS_ROUTE) {
                 SettingsScreen(
@@ -224,6 +232,18 @@ fun KargathraApp(
                             launchSingleTop = true
                         }
                     }
+                )
+            }
+
+            composable(
+                "history_summary/{workoutId}",
+                arguments = listOf(navArgument("workoutId") { type = NavType.LongType })
+            ) { backEntry ->
+                val sid = backEntry.arguments?.getLong("workoutId") ?: 0L
+                SessionSummaryScreen(
+                    repo = repo,
+                    workoutId = sid,
+                    onDone = { nav.popBackStack() }
                 )
             }
         }

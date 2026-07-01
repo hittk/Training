@@ -12,6 +12,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ChevronRight
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.kargathra.fitness.data.db.ExerciseRef
 import com.kargathra.fitness.data.repo.MuscleVolume
@@ -27,9 +29,14 @@ import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 
 @Composable
-fun ProgressScreen(repo: WorkoutRepository, modifier: Modifier = Modifier) {
+fun ProgressScreen(
+    repo: WorkoutRepository,
+    onOpenSession: (Long) -> Unit = {},
+    modifier: Modifier = Modifier
+) {
     val exercises    by repo.observeLoggedExercises().collectAsStateWithLifecycle(emptyList())
     val weeklyVolume by repo.weeklyMuscleVolume().collectAsStateWithLifecycle(emptyList())
+    val workouts     by repo.observeWorkouts().collectAsStateWithLifecycle(emptyList())
     var selected     by remember { mutableStateOf<ExerciseRef?>(null) }
 
     LaunchedEffect(exercises) {
@@ -50,6 +57,38 @@ fun ProgressScreen(repo: WorkoutRepository, modifier: Modifier = Modifier) {
     ) {
         // ── Plate calculator ───────────────────────────────────────────────────
         PlateCalculatorCard()
+
+        // ── Recent sessions ────────────────────────────────────────────────────
+        val recent = workouts.filter { it.completedAt != null }.take(15)
+        if (recent.isNotEmpty()) {
+            SectionLabel("Recent sessions")
+            KCard {
+                recent.forEachIndexed { i, w ->
+                    if (i > 0) HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+                    Row(
+                        Modifier.fillMaxWidth()
+                            .clickable { onOpenSession(w.id) }
+                            .padding(vertical = 10.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column(Modifier.weight(1f)) {
+                            Text(w.title, style = MaterialTheme.typography.titleMedium)
+                            val mins = ((w.completedAt!! - w.startedAt) / 60000).coerceAtLeast(0)
+                            Text(
+                                "${fmtDate(w.startedAt)} · $mins min",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                        Icon(
+                            Icons.AutoMirrored.Filled.ChevronRight,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
+            }
+        }
 
         // ── Weekly muscle volume ───────────────────────────────────────────────
         if (weeklyVolume.isNotEmpty()) {

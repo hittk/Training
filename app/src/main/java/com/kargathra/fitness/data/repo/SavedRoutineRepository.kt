@@ -58,6 +58,24 @@ class SavedRoutineRepository(private val dao: SavedRoutineDao) {
         dao.upsert(SavedRoutineEntity(programId, updated.title, toJson(updated)))
     }
 
+    /** Update sets/reps/rest of the item at [index] in a saved program. */
+    suspend fun updateItemAt(
+        programId: String,
+        index: Int,
+        sets: Int,
+        repTarget: IntRange,
+        restSeconds: Int
+    ) {
+        val current = load(programId) ?: return
+        if (index !in current.items.indices) return
+        val newItems = current.items.toMutableList()
+        newItems[index] = newItems[index].copy(
+            sets = sets, repTarget = repTarget, restSeconds = restSeconds
+        )
+        val updated = current.copy(items = newItems)
+        dao.upsert(SavedRoutineEntity(programId, updated.title, toJson(updated)))
+    }
+
     /** Rename a saved program. */
     suspend fun rename(programId: String, title: String) {
         val current = load(programId) ?: return

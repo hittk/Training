@@ -36,6 +36,7 @@ fun ProgramsScreen(
     onDeleteRoutine: (Routine) -> Unit = {},
     onRenameProgram: (Routine, String) -> Unit = { _, _ -> },
     onRemoveItem: (Routine, Int) -> Unit = { _, _ -> },
+    onEditItem: (Routine, Int, Int, IntRange, Int) -> Unit = { _, _, _, _, _ -> },
     onCreateProgram: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
@@ -88,7 +89,8 @@ fun ProgramsScreen(
                         onLoad     = { onLoadRoutine(routine) },
                         onDelete   = { onDeleteRoutine(routine) },
                         onRename   = { newName -> onRenameProgram(routine, newName) },
-                        onRemoveItem = { idx -> onRemoveItem(routine, idx) }
+                        onRemoveItem = { idx -> onRemoveItem(routine, idx) },
+                        onEditItem   = { idx, s, r, rest -> onEditItem(routine, idx, s, r, rest) }
                     )
                 }
             }
@@ -207,11 +209,13 @@ private fun SavedRoutineRow(
     onLoad: () -> Unit,
     onDelete: () -> Unit,
     onRename: (String) -> Unit,
-    onRemoveItem: (Int) -> Unit
+    onRemoveItem: (Int) -> Unit,
+    onEditItem: (Int, Int, IntRange, Int) -> Unit
 ) {
     var expanded by remember { mutableStateOf(false) }
     var confirmDelete by remember { mutableStateOf(false) }
     var renaming by remember { mutableStateOf(false) }
+    var editingIdx by remember { mutableStateOf<Int?>(null) }
 
     Column {
         Row(
@@ -247,7 +251,9 @@ private fun SavedRoutineRow(
                 } else {
                     routine.items.forEachIndexed { idx, item ->
                         Row(
-                            Modifier.fillMaxWidth().padding(vertical = 2.dp),
+                            Modifier.fillMaxWidth()
+                                .clickable { editingIdx = idx }
+                                .padding(vertical = 2.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             Text(
@@ -286,6 +292,61 @@ private fun SavedRoutineRow(
                     }
                 }
             }
+        }
+    }
+
+    editingIdx?.let { idx ->
+        val item = routine.items.getOrNull(idx)
+        if (item == null) { editingIdx = null } else {
+            var setsText by remember(idx) { mutableStateOf(item.sets.toString()) }
+            var repFromText by remember(idx) { mutableStateOf(item.repTarget.first.toString()) }
+            var repToText by remember(idx) { mutableStateOf(item.repTarget.last.toString()) }
+            var restText by remember(idx) { mutableStateOf(item.restSeconds.toString()) }
+            AlertDialog(
+                onDismissRequest = { editingIdx = null },
+                title = { Text(item.exercise.name) },
+                text = {
+                    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                        OutlinedTextField(
+                            value = setsText,
+                            onValueChange = { setsText = it.filter { ch -> ch.isDigit() } },
+                            label = { Text("Sets") }, singleLine = true
+                        )
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            OutlinedTextField(
+                                value = repFromText,
+                                onValueChange = { repFromText = it.filter { ch -> ch.isDigit() } },
+                                label = { Text("Reps from") }, singleLine = true,
+                                modifier = Modifier.weight(1f)
+                            )
+                            OutlinedTextField(
+                                value = repToText,
+                                onValueChange = { repToText = it.filter { ch -> ch.isDigit() } },
+                                label = { Text("Reps to") }, singleLine = true,
+                                modifier = Modifier.weight(1f)
+                            )
+                        }
+                        OutlinedTextField(
+                            value = restText,
+                            onValueChange = { restText = it.filter { ch -> ch.isDigit() } },
+                            label = { Text("Rest (seconds)") }, singleLine = true
+                        )
+                    }
+                },
+                confirmButton = {
+                    TextButton(onClick = {
+                        val s = setsText.toIntOrNull() ?: item.sets
+                        val rf = repFromText.toIntOrNull() ?: item.repTarget.first
+                        val rt = repToText.toIntOrNull() ?: item.repTarget.last
+                        val rest = restText.toIntOrNull() ?: item.restSeconds
+                        val lo = minOf(rf, rt).coerceAtLeast(1)
+                        val hi = maxOf(rf, rt).coerceAtLeast(1)
+                        onEditItem(idx, s.coerceIn(1, 20), lo..hi, rest.coerceIn(0, 600))
+                        editingIdx = null
+                    }) { Text("Save") }
+                },
+                dismissButton = { TextButton(onClick = { editingIdx = null }) { Text("Cancel") } }
+            )
         }
     }
 
