@@ -55,6 +55,8 @@ fun KargathraApp(
     val currentRoute = backStack?.destination?.route
 
     // Shared state
+    val context       = LocalContext.current
+    val prefs         = remember { context.getSharedPreferences("kargathra", Context.MODE_PRIVATE) }
     var activeRoutine by remember {
         mutableStateOf<Routine>(
             prefs.getString("last_routine_json", null)
@@ -66,8 +68,6 @@ fun KargathraApp(
         prefs.edit().putString("last_routine_json", savedRepo.toJson(activeRoutine)).apply()
     }
     val savedRoutines by savedRepo.savedRoutines.collectAsStateWithLifecycle(emptyList())
-    val context       = LocalContext.current
-    val prefs         = remember { context.getSharedPreferences("kargathra", Context.MODE_PRIVATE) }
     var hasPunchBag   by remember { mutableStateOf(prefs.getBoolean("has_punch_bag", false)) }
     var resumeWorkout by remember { mutableStateOf<WorkoutEntity?>(null) }
     LaunchedEffect(Unit) {
