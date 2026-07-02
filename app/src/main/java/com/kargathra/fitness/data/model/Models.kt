@@ -10,7 +10,10 @@ enum class Equipment(val display: String) {
     PREACHER_STATION("Preacher curl station"),
     SPIN_BIKE("Spin bike"),
     TREADMILL("Incline treadmill"),
-    BODYWEIGHT("Bodyweight")
+    BODYWEIGHT("Bodyweight"),
+    KETTLEBELL("Kettlebell"),
+    MACHINE("Machine"),
+    OTHER("Other")
 }
 
 enum class MuscleGroup(val display: String) {

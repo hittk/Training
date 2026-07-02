@@ -16,6 +16,8 @@ interface WorkoutDao {
     @Query("SELECT * FROM workouts ORDER BY startedAt DESC") fun observeWorkouts(): Flow<List<WorkoutEntity>>
     @Query("SELECT * FROM workouts ORDER BY startedAt ASC") suspend fun allWorkouts(): List<WorkoutEntity>
     @Query("SELECT * FROM sets ORDER BY id ASC") suspend fun allSets(): List<SetEntity>
+    @Query("SELECT * FROM sets WHERE exerciseId = :id ORDER BY performedAt DESC LIMIT 1")
+    suspend fun lastSetForExercise(id: String): SetEntity?
 
     @Insert suspend fun insertSet(s: SetEntity): Long
     @Delete suspend fun deleteSet(s: SetEntity)

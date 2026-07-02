@@ -9,13 +9,19 @@ import com.kargathra.fitness.data.db.ExerciseEntity
  * MuscleGroup enum), so library exercises can be added to custom programs.
  */
 
-private fun equipmentFor(entity: ExerciseEntity): List<Equipment> = when (entity.equipment.lowercase()) {
+/** Equipment where no external load is logged — reps only. */
+private val WEIGHTLESS = setOf(
+    "body only", "punching bag", "jump rope", "assault bike", "battle ropes", "plyo box"
+)
+
+private fun equipmentFor(entity: ExerciseEntity): List<Equipment> = when (val e = entity.equipment.lowercase()) {
     "barbell"        -> listOf(Equipment.BARBELL)
     "dumbbell"       -> listOf(Equipment.DUMBBELL)
-    "kettlebell"     -> listOf(Equipment.DUMBBELL)
+    "kettlebell"     -> listOf(Equipment.KETTLEBELL)
     "medicine ball"  -> listOf(Equipment.MEDICINE_BALL)
-    "body only"      -> listOf(Equipment.BODYWEIGHT)
-    else             -> listOf(Equipment.BODYWEIGHT)
+    "machine"        -> listOf(Equipment.MACHINE)
+    in WEIGHTLESS    -> listOf(Equipment.BODYWEIGHT)
+    else             -> listOf(Equipment.OTHER)
 }
 
 private fun patternFor(entity: ExerciseEntity): Pattern = when (entity.force.lowercase()) {

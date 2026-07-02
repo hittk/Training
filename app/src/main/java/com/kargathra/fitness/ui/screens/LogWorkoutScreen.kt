@@ -23,6 +23,7 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.kargathra.fitness.data.db.SetEntity
+import com.kargathra.fitness.data.model.Equipment
 import com.kargathra.fitness.data.model.Exercise
 import com.kargathra.fitness.data.model.Routine
 import com.kargathra.fitness.data.repo.ExerciseRepository
@@ -112,10 +113,12 @@ fun LogWorkoutScreen(
             val exercise = item.exercise
             val logged   = sets.filter { it.exerciseId == exercise.id }
 
-            // Load the personal best for this exercise once
+            // Load the personal best + most recent set for this exercise once
             var pb by remember { mutableStateOf<SetEntity?>(null) }
+            var lastSet by remember { mutableStateOf<SetEntity?>(null) }
             LaunchedEffect(exercise.id) {
                 pb = repo.bestSetForExercise(exercise.id)
+                lastSet = repo.lastSetForExercise(exercise.id)
             }
 
             ExerciseLogCard(
@@ -123,6 +126,7 @@ fun LogWorkoutScreen(
                 target     = "${item.sets} × ${item.repTarget.first}–${item.repTarget.last}",
                 logged     = logged,
                 personalBest = pb,
+                lastSet    = lastSet,
                 exerciseRepo = exerciseRepo,
                 onAdd      = { w, r ->
                     scope.launch {
@@ -207,12 +211,15 @@ private fun ExerciseLogCard(
     target: String,
     logged: List<SetEntity>,
     personalBest: SetEntity?,
+    lastSet: SetEntity?,
     exerciseRepo: ExerciseRepository,
     onAdd: (Double, Int) -> Unit,
     onDelete: (SetEntity) -> Unit
 ) {
+    val isBodyweight = Equipment.BODYWEIGHT in exercise.equipment
     var showInfo by remember { mutableStateOf(false) }
     var prWeight by remember { mutableStateOf<Double?>(null) }
+    var prReps by remember { mutableStateOf<Int?>(null) }
     KCard {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Text(
@@ -235,6 +242,14 @@ private fun ExerciseLogCard(
             modifier = Modifier.padding(top = 2.dp)
         )
 
+        prReps?.let { r ->
+            Text(
+                "\uD83C\uDFC6 New PR \u2014 $r reps! Previous best beaten.",
+                style = MaterialTheme.typography.titleSmall,
+                color = Gold,
+                modifier = Modifier.padding(top = 6.dp)
+            )
+        }
         prWeight?.let { w ->
             Text(
                 "\uD83C\uDFC6 New PR \u2014 ${fmt(w)} kg! Previous best beaten.",
@@ -254,7 +269,14 @@ private fun ExerciseLogCard(
         }
 
         // Progressive overload suggestion
-        if (personalBest != null) {
+        if (personalBest != null && isBodyweight) {
+            Text(
+                "Best: ${personalBest.reps} reps",
+                style = MaterialTheme.typography.labelMedium,
+                color = Gold,
+                modifier = Modifier.padding(top = 4.dp)
+            )
+        } else if (personalBest != null) {
             val suggestedWeight = nextWeight(personalBest.weightKg, personalBest.reps, exercise.repRange)
             val suggestion = buildString {
                 append("Last PB: ${fmt(personalBest.weightKg)} kg × ${personalBest.reps}")
@@ -275,10 +297,17 @@ private fun ExerciseLogCard(
 
         Spacer(Modifier.height(12.dp))
         SetEntryRow(
-            initialWeight = personalBest?.weightKg ?: logged.lastOrNull()?.weightKg ?: 20.0,
-            initialReps   = logged.lastOrNull()?.reps ?: exercise.repRange.first.coerceAtLeast(1),
+            bodyweight    = isBodyweight,
+            initialWeight = logged.lastOrNull()?.weightKg ?: lastSet?.weightKg
+                ?: personalBest?.weightKg ?: 20.0,
+            initialReps   = logged.lastOrNull()?.reps ?: lastSet?.reps
+                ?: exercise.repRange.first.coerceAtLeast(1),
             onAdd         = { w, r ->
-                if (w > (personalBest?.weightKg ?: 0.0)) prWeight = w
+                if (isBodyweight) {
+                    if (r > (personalBest?.reps ?: 0)) prReps = r
+                } else {
+                    if (w > (personalBest?.weightKg ?: 0.0)) prWeight = w
+                }
                 onAdd(w, r)
             }
         )
@@ -313,7 +342,7 @@ private fun LoggedSetRow(index: Int, s: SetEntity, onDelete: (SetEntity) -> Unit
             modifier = Modifier.width(48.dp)
         )
         Text(
-            "${fmt(s.weightKg)} kg × ${s.reps}",
+            if (s.weightKg > 0.0) "${fmt(s.weightKg)} kg × ${s.reps}" else "${s.reps} reps",
             style    = MaterialTheme.typography.titleMedium,
             modifier = Modifier.weight(1f)
         )
@@ -328,6 +357,7 @@ private fun LoggedSetRow(index: Int, s: SetEntity, onDelete: (SetEntity) -> Unit
 
 @Composable
 private fun SetEntryRow(
+    bodyweight: Boolean,
     initialWeight: Double,
     initialReps: Int,
     onAdd: (Double, Int) -> Unit
@@ -343,16 +373,18 @@ private fun SetEntryRow(
     }
 
     Row(verticalAlignment = Alignment.CenterVertically) {
-        Stepper(
-            label    = "kg",
-            value    = weight,
-            onValue  = { weight = it },
-            onMinus  = { adjustWeight(-2.5) },
-            onPlus   = { adjustWeight(2.5) },
-            keyboard = KeyboardType.Decimal,
-            modifier = Modifier.weight(1f)
-        )
-        Spacer(Modifier.width(10.dp))
+        if (!bodyweight) {
+            Stepper(
+                label    = "kg",
+                value    = weight,
+                onValue  = { weight = it },
+                onMinus  = { adjustWeight(-2.5) },
+                onPlus   = { adjustWeight(2.5) },
+                keyboard = KeyboardType.Decimal,
+                modifier = Modifier.weight(1f)
+            )
+            Spacer(Modifier.width(10.dp))
+        }
         Stepper(
             label    = "reps",
             value    = reps,
@@ -364,7 +396,7 @@ private fun SetEntryRow(
         )
         Spacer(Modifier.width(10.dp))
         FilledIconButton(onClick = {
-            val w = weight.toDoubleOrNull()
+            val w = if (bodyweight) 0.0 else weight.toDoubleOrNull()
             val r = reps.toIntOrNull()
             if (w != null && r != null && r > 0) onAdd(w, r)
         }) { Icon(Icons.Filled.Add, contentDescription = "Add set") }

@@ -196,6 +196,9 @@ class WorkoutRepository(
     fun observeLoggedExercises(): Flow<List<ExerciseRef>> = dao.observeLoggedExercises()
     suspend fun getWorkout(id: Long): WorkoutEntity? = dao.getWorkout(id)
 
+    /** The most recently performed set for an exercise (any workout). */
+    suspend fun lastSetForExercise(id: String): SetEntity? = dao.lastSetForExercise(id)
+
     fun observeWorkouts(): Flow<List<WorkoutEntity>> = dao.observeWorkouts()
 
     // ── Trends ────────────────────────────────────────────────────────────────
