@@ -21,7 +21,7 @@ import androidx.navigation.navArgument
 import com.kargathra.fitness.data.repo.ExerciseRepository
 import com.kargathra.fitness.data.backup.BackupManager
 import com.kargathra.fitness.data.db.WorkoutEntity
-import com.kargathra.fitness.ui.components.SplashVideo
+import com.kargathra.fitness.ui.components.SplashImage
 import com.kargathra.fitness.data.repo.FavouriteRepository
 import com.kargathra.fitness.data.repo.SavedRoutineRepository
 import com.kargathra.fitness.data.repo.WorkoutRepository
@@ -83,7 +83,7 @@ fun KargathraApp(
 
     var showSplash by rememberSaveable { mutableStateOf(true) }
     if (showSplash) {
-        SplashVideo(onDone = { showSplash = false })
+        SplashImage(onDone = { showSplash = false })
         return
     }
 
