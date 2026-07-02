@@ -2,6 +2,8 @@ package com.kargathra.fitness.ui.screens
 
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.clickable
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
 import kotlinx.coroutines.launch
@@ -278,12 +280,46 @@ private fun ExerciseDetailSheet(
         ) {
             if (videoExists) {
                 item {
-                    ExerciseVideo(
-                        videoUrl   = ex.videoUrl,
-                        fallbackId = ex.id,
-                        refreshKey = videoRefresh,
-                        modifier   = Modifier.clip(MaterialTheme.shapes.medium)
-                    )
+                    var confirmVideoDelete by remember(ex.id) { mutableStateOf(false) }
+                    val isUserVideo = remember(ex.id, videoRefresh) { UserVideoStore.has(ctx, ex.id) }
+                    Box(
+                        Modifier.pointerInput(ex.id, isUserVideo) {
+                            if (isUserVideo) {
+                                detectTapGestures(onLongPress = { confirmVideoDelete = true })
+                            }
+                        }
+                    ) {
+                        ExerciseVideo(
+                            videoUrl   = ex.videoUrl,
+                            fallbackId = ex.id,
+                            refreshKey = videoRefresh,
+                            modifier   = Modifier.clip(MaterialTheme.shapes.medium)
+                        )
+                    }
+                    if (isUserVideo) {
+                        Text(
+                            "Your video · long-press to remove",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.padding(top = 4.dp)
+                        )
+                    }
+                    if (confirmVideoDelete) {
+                        AlertDialog(
+                            onDismissRequest = { confirmVideoDelete = false },
+                            title = { Text("Remove your video?") },
+                            text = { Text("Deletes the video you added for this exercise. A bundled demo will show instead if one exists.") },
+                            confirmButton = {
+                                TextButton(onClick = {
+                                    confirmVideoDelete = false
+                                    if (UserVideoStore.delete(ctx, ex.id)) videoRefresh++
+                                }) { Text("Remove") }
+                            },
+                            dismissButton = {
+                                TextButton(onClick = { confirmVideoDelete = false }) { Text("Cancel") }
+                            }
+                        )
+                    }
                 }
             } else {
                 item {

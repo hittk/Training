@@ -40,6 +40,10 @@ object UserVideoStore {
         }
     }
 
+    /** Deletes the user's video for this exercise. True if a file was removed. */
+    fun delete(context: Context, exerciseId: String): Boolean =
+        fileFor(context, exerciseId).let { it.exists() && it.delete() }
+
     private fun safe(id: String): String =
         id.lowercase().replace(Regex("[^a-z0-9_]"), "_")
 }

@@ -11,6 +11,8 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Modifier
 import androidx.navigation.NavDestination.Companion.hierarchy
 import androidx.navigation.NavType
+import androidx.compose.foundation.pager.HorizontalPager
+import androidx.compose.foundation.pager.rememberPagerState
 import androidx.navigation.compose.NavHost
 import com.kargathra.fitness.ui.screens.SessionSummaryScreen
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -49,10 +51,20 @@ fun KargathraApp(
     val nav   = rememberNavController()
     val scope = rememberCoroutineScope()
     val backStack by nav.currentBackStackEntryAsState()
+    val pagerState = rememberPagerState(pageCount = { Destination.bottomBar.size })
     val currentRoute = backStack?.destination?.route
 
     // Shared state
-    var activeRoutine by remember { mutableStateOf<Routine>(SampleData.upperBodyDay) }
+    var activeRoutine by remember {
+        mutableStateOf<Routine>(
+            prefs.getString("last_routine_json", null)
+                ?.let { runCatching { savedRepo.fromJson(it) }.getOrNull() }
+                ?: SampleData.upperBodyDay
+        )
+    }
+    LaunchedEffect(activeRoutine) {
+        prefs.edit().putString("last_routine_json", savedRepo.toJson(activeRoutine)).apply()
+    }
     val savedRoutines by savedRepo.savedRoutines.collectAsStateWithLifecycle(emptyList())
     val context       = LocalContext.current
     val prefs         = remember { context.getSharedPreferences("kargathra", Context.MODE_PRIVATE) }
@@ -78,6 +90,7 @@ fun KargathraApp(
         currentRoute == SETTINGS_ROUTE  -> "Settings"
         currentRoute == GENERATOR_ROUTE -> "Build my workout"
         currentRoute?.startsWith("log") == true -> "Log workout"
+        currentRoute == "home" -> Destination.bottomBar[pagerState.currentPage].label
         else -> Destination.bottomBar.firstOrNull { it.route == currentRoute }?.label ?: "Kargathra"
     }
 
@@ -105,17 +118,19 @@ fun KargathraApp(
         },
         bottomBar = {
             NavigationBar(containerColor = MaterialTheme.colorScheme.surface) {
-                val dest = backStack?.destination
-                Destination.bottomBar.forEach { d ->
-                    val selected = dest?.hierarchy?.any { it.route == d.route } == true
+                val onHome = currentRoute == "home"
+                Destination.bottomBar.forEachIndexed { index, d ->
+                    val selected = onHome && pagerState.currentPage == index
                     NavigationBarItem(
                         selected  = selected,
                         onClick   = {
-                            nav.navigate(d.route) {
-                                popUpTo(Destination.WORKOUT.route) { saveState = true }
-                                launchSingleTop = true
-                                restoreState    = true
+                            if (!onHome) {
+                                nav.navigate("home") {
+                                    popUpTo("home") { inclusive = false }
+                                    launchSingleTop = true
+                                }
                             }
+                            scope.launch { pagerState.animateScrollToPage(index) }
                         },
                         icon  = { Icon(d.icon, contentDescription = d.label) },
                         label = { Text(d.label) },
@@ -133,74 +148,70 @@ fun KargathraApp(
     ) { inner ->
         NavHost(
             navController      = nav,
-            startDestination   = Destination.WORKOUT.route,
+            startDestination   = "home",
             modifier           = Modifier.padding(inner)
         ) {
-            composable(Destination.WORKOUT.route) {
-                WorkoutScreen(
-                    activeRoutine   = activeRoutine,
-                    onStart         = {
-                        scope.launch {
-                            val id = repo.startWorkout(activeRoutine.title)
-                            prefs.edit()
-                                .putLong("active_workout_id", id)
-                                .putString("active_routine_json", savedRepo.toJson(activeRoutine))
-                                .apply()
-                            resumeWorkout = null
-                            nav.navigate("log/$id/${activeRoutine.id}")
-                        }
-                    },
-                    resumeTitle     = resumeWorkout?.title,
-                    onResume        = {
-                        val w = resumeWorkout ?: return@WorkoutScreen
-                        prefs.getString("active_routine_json", null)?.let { json ->
-                            runCatching { savedRepo.fromJson(json) }.getOrNull()?.let { r ->
-                                activeRoutine = r
+            composable("home") {
+                HorizontalPager(
+                    state = pagerState,
+                    beyondViewportPageCount = 1
+                ) { page ->
+                    when (page) {
+                        0 -> WorkoutScreen(
+                            activeRoutine   = activeRoutine,
+                            onStart         = {
+                                scope.launch {
+                                    val id = repo.startWorkout(activeRoutine.title)
+                                    prefs.edit()
+                                        .putLong("active_workout_id", id)
+                                        .putString("active_routine_json", savedRepo.toJson(activeRoutine))
+                                        .apply()
+                                    resumeWorkout = null
+                                    nav.navigate("log/$id/${activeRoutine.id}")
+                                }
+                            },
+                            resumeTitle     = resumeWorkout?.title,
+                            onResume        = {
+                                val w = resumeWorkout ?: return@WorkoutScreen
+                                prefs.getString("active_routine_json", null)?.let { json ->
+                                    runCatching { savedRepo.fromJson(json) }.getOrNull()?.let { r ->
+                                        activeRoutine = r
+                                    }
+                                }
+                                nav.navigate("log/${w.id}/${activeRoutine.id}")
+                            },
+                            onDiscardResume = {
+                                prefs.edit().remove("active_workout_id").remove("active_routine_json").apply()
+                                resumeWorkout = null
                             }
-                        }
-                        nav.navigate("log/${w.id}/${activeRoutine.id}")
-                    },
-                    onDiscardResume = {
-                        prefs.edit().remove("active_workout_id").remove("active_routine_json").apply()
-                        resumeWorkout = null
+                        )
+                        1 -> ProgramsScreen(
+                            onBuildWorkout  = { nav.navigate(GENERATOR_ROUTE) },
+                            onLoadRoutine   = { routine ->
+                                activeRoutine = routine
+                                scope.launch { pagerState.animateScrollToPage(0) }
+                            },
+                            savedRoutines   = savedRoutines,
+                            onDeleteRoutine = { routine -> scope.launch { savedRepo.delete(routine.id) } },
+                            onRenameProgram = { routine, name -> scope.launch { savedRepo.rename(routine.id, name) } },
+                            onRemoveItem    = { routine, idx -> scope.launch { savedRepo.removeItemAt(routine.id, idx) } },
+                            onEditItem      = { routine, idx, s, reps, rest ->
+                                scope.launch { savedRepo.updateItemAt(routine.id, idx, s, reps, rest) }
+                            },
+                            onCreateProgram = { scope.launch { savedRepo.createEmpty("New Program") } }
+                        )
+                        2 -> ExercisesScreen(
+                            repo        = exerciseRepo,
+                            favRepo     = favRepo,
+                            savedRepo   = savedRepo,
+                            hasPunchBag = hasPunchBag
+                        )
+                        3 -> ProgressScreen(
+                            repo = repo,
+                            onOpenSession = { id -> nav.navigate("history_summary/$id") }
+                        )
                     }
-                )
-            }
-
-            composable(Destination.PROGRAMS.route) {
-                ProgramsScreen(
-                    onBuildWorkout  = { nav.navigate(GENERATOR_ROUTE) },
-                    onLoadRoutine   = { routine ->
-                        activeRoutine = routine
-                        nav.navigate(Destination.WORKOUT.route) {
-                            popUpTo(Destination.WORKOUT.route) { inclusive = true }
-                        }
-                    },
-                    savedRoutines   = savedRoutines,
-                    onDeleteRoutine = { routine -> scope.launch { savedRepo.delete(routine.id) } },
-                    onRenameProgram = { routine, name -> scope.launch { savedRepo.rename(routine.id, name) } },
-                    onRemoveItem    = { routine, idx -> scope.launch { savedRepo.removeItemAt(routine.id, idx) } },
-                    onEditItem      = { routine, idx, s, reps, rest ->
-                        scope.launch { savedRepo.updateItemAt(routine.id, idx, s, reps, rest) }
-                    },
-                    onCreateProgram = { scope.launch { savedRepo.createEmpty("New Program") } }
-                )
-            }
-
-            composable(Destination.EXERCISES.route) {
-                ExercisesScreen(
-                    repo        = exerciseRepo,
-                    favRepo     = favRepo,
-                    savedRepo   = savedRepo,
-                    hasPunchBag = hasPunchBag
-                )
-            }
-
-            composable(Destination.PROGRESS.route) {
-                ProgressScreen(
-                    repo = repo,
-                    onOpenSession = { id -> nav.navigate("history_summary/$id") }
-                )
+                }
             }
 
             composable(SETTINGS_ROUTE) {
@@ -226,8 +237,9 @@ fun KargathraApp(
                     onSaveRoutine   = { routine -> scope.launch { savedRepo.save(routine) } },
                     onLoadRoutine = { routine ->
                         activeRoutine = routine
-                        nav.navigate(Destination.WORKOUT.route) {
-                            popUpTo(Destination.WORKOUT.route) { inclusive = true }
+                        scope.launch { pagerState.scrollToPage(0) }
+                        nav.navigate("home") {
+                            popUpTo("home") { inclusive = true }
                         }
                     }
                 )
@@ -253,7 +265,7 @@ fun KargathraApp(
                         prefs.edit().remove("active_workout_id").remove("active_routine_json").apply()
                         resumeWorkout = null
                         nav.navigate("summary/$wid") {
-                            popUpTo(Destination.WORKOUT.route) { inclusive = false }
+                            popUpTo("home") { inclusive = false }
                             launchSingleTop = true
                         }
                     }
@@ -269,8 +281,8 @@ fun KargathraApp(
                     repo = repo,
                     workoutId = sid,
                     onDone = {
-                        nav.navigate(Destination.WORKOUT.route) {
-                            popUpTo(Destination.WORKOUT.route) { inclusive = true }
+                        nav.navigate("home") {
+                            popUpTo("home") { inclusive = true }
                             launchSingleTop = true
                         }
                     }
