@@ -19,6 +19,9 @@ interface WorkoutDao {
     @Query("SELECT * FROM sets WHERE exerciseId = :id ORDER BY performedAt DESC LIMIT 1")
     suspend fun lastSetForExercise(id: String): SetEntity?
 
+    @Query("DELETE FROM sets WHERE workoutId = :id") suspend fun deleteSetsForWorkout(id: Long)
+    @Query("DELETE FROM workouts WHERE id = :id") suspend fun deleteWorkout(id: Long)
+
     @Insert suspend fun insertSet(s: SetEntity): Long
     @Delete suspend fun deleteSet(s: SetEntity)
     @Query("SELECT * FROM sets WHERE workoutId = :wid ORDER BY id ASC")

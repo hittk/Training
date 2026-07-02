@@ -13,6 +13,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.material.icons.Icons
+import kotlinx.coroutines.launch
+import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.KeyboardArrowRight
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.kargathra.fitness.data.db.ExerciseRef
@@ -21,7 +23,6 @@ import com.kargathra.fitness.data.repo.TrendPoint
 import com.kargathra.fitness.data.repo.WorkoutRepository
 import com.kargathra.fitness.ui.components.KCard
 import com.kargathra.fitness.ui.components.MuscleVolumeChart
-import com.kargathra.fitness.ui.components.PlateCalculatorCard
 import com.kargathra.fitness.ui.components.SectionLabel
 import com.kargathra.fitness.ui.components.TrendChart
 import java.time.Instant
@@ -55,41 +56,6 @@ fun ProgressScreen(
         modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(20.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
-        // ── Plate calculator ───────────────────────────────────────────────────
-        PlateCalculatorCard()
-
-        // ── Recent sessions ────────────────────────────────────────────────────
-        val recent = workouts.filter { it.completedAt != null }.take(15)
-        if (recent.isNotEmpty()) {
-            SectionLabel("Recent sessions")
-            KCard {
-                recent.forEachIndexed { i, w ->
-                    if (i > 0) HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
-                    Row(
-                        Modifier.fillMaxWidth()
-                            .clickable { onOpenSession(w.id) }
-                            .padding(vertical = 10.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Column(Modifier.weight(1f)) {
-                            Text(w.title, style = MaterialTheme.typography.titleMedium)
-                            val mins = ((w.completedAt!! - w.startedAt) / 60000).coerceAtLeast(0)
-                            Text(
-                                "${fmtDate(w.startedAt)} · $mins min",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                        }
-                        Icon(
-                            Icons.Filled.KeyboardArrowRight,
-                            contentDescription = null,
-                            tint = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
-                }
-            }
-        }
-
         // ── Weekly muscle volume ───────────────────────────────────────────────
         if (weeklyVolume.isNotEmpty()) {
             MuscleVolumeChart(volumes = weeklyVolume)
@@ -102,6 +68,61 @@ fun ProgressScreen(
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
+        }
+
+        // ── Recent sessions (tap to open, bin to delete) ──────────────────────
+        val scope = rememberCoroutineScope()
+        var deleteTarget by remember { mutableStateOf<Long?>(null) }
+        val recent = workouts.filter { it.completedAt != null }.take(15)
+        if (recent.isNotEmpty()) {
+            SectionLabel("Recent sessions")
+            KCard {
+                recent.forEachIndexed { i, w ->
+                    if (i > 0) HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+                    Row(
+                        Modifier.fillMaxWidth()
+                            .clickable { onOpenSession(w.id) }
+                            .padding(vertical = 6.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column(Modifier.weight(1f)) {
+                            Text(w.title, style = MaterialTheme.typography.titleMedium)
+                            val mins = ((w.completedAt!! - w.startedAt) / 60000).coerceAtLeast(0)
+                            Text(
+                                "${fmtDate(w.startedAt)} · $mins min",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                        IconButton(onClick = { deleteTarget = w.id }) {
+                            Icon(
+                                Icons.Filled.Delete,
+                                contentDescription = "Delete session",
+                                tint = MaterialTheme.colorScheme.error
+                            )
+                        }
+                        Icon(
+                            Icons.Filled.KeyboardArrowRight,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
+            }
+        }
+        deleteTarget?.let { id ->
+            AlertDialog(
+                onDismissRequest = { deleteTarget = null },
+                title = { Text("Delete session?") },
+                text = { Text("Removes this workout and all its logged sets from history. This can't be undone.") },
+                confirmButton = {
+                    TextButton(onClick = {
+                        deleteTarget = null
+                        scope.launch { repo.deleteWorkout(id) }
+                    }) { Text("Delete") }
+                },
+                dismissButton = { TextButton(onClick = { deleteTarget = null }) { Text("Cancel") } }
+            )
         }
 
         // ── Strength trends ────────────────────────────────────────────────────
@@ -155,31 +176,7 @@ fun ProgressScreen(
             footer      = "Epley estimate from your top set"
         )
 
-        SectionLabel("Recent sessions")
-        KCard {
-            trends.reversed().take(8).forEachIndexed { i, p ->
-                if (i > 0) HorizontalDivider(color = MaterialTheme.colorScheme.outline)
-                Row(
-                    Modifier.fillMaxWidth().padding(vertical = 10.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text(
-                        fmtDate(p.timeMillis),
-                        style    = MaterialTheme.typography.titleMedium,
-                        modifier = Modifier.width(96.dp)
-                    )
-                    Column(Modifier.weight(1f)) {
-                        Text("Top set ${fmt(p.topWeight)} kg",
-                            style = MaterialTheme.typography.bodyMedium)
-                        Text(
-                            "1RM ${fmt(p.estimated1Rm)} · vol ${fmt(p.volume)} kg",
-                            style = MaterialTheme.typography.labelMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
-                }
-            }
-        }
+
     }
 }
 

@@ -196,6 +196,12 @@ class WorkoutRepository(
     fun observeLoggedExercises(): Flow<List<ExerciseRef>> = dao.observeLoggedExercises()
     suspend fun getWorkout(id: Long): WorkoutEntity? = dao.getWorkout(id)
 
+    /** Delete a workout and all of its sets (history cleanup). */
+    suspend fun deleteWorkout(id: Long) {
+        dao.deleteSetsForWorkout(id)
+        dao.deleteWorkout(id)
+    }
+
     /** The most recently performed set for an exercise (any workout). */
     suspend fun lastSetForExercise(id: String): SetEntity? = dao.lastSetForExercise(id)
 
