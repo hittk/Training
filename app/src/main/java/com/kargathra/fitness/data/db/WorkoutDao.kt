@@ -50,6 +50,23 @@ interface WorkoutDao {
     suspend fun bestSetForExercise(exId: String): SetEntity?
 
     /**
+     * All sets for an exercise from the most recent COMPLETED workout that
+     * contained it — the "Previous session" reference shown while logging.
+     */
+    @Query("""
+        SELECT s.* FROM sets s
+        WHERE s.exerciseId = :exId AND s.workoutId = (
+            SELECT s2.workoutId FROM sets s2
+            INNER JOIN workouts w ON s2.workoutId = w.id
+            WHERE s2.exerciseId = :exId AND w.completedAt IS NOT NULL
+            ORDER BY w.startedAt DESC
+            LIMIT 1
+        )
+        ORDER BY s.id ASC
+    """)
+    suspend fun lastSessionSets(exId: String): List<SetEntity>
+
+    /**
      * All sets from workouts that started within a given time window.
      * Used for the weekly muscle-group volume summary.
      */

@@ -19,7 +19,11 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.buildAnnotatedString
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.kargathra.fitness.data.db.SetEntity
@@ -116,9 +120,11 @@ fun LogWorkoutScreen(
             // Load the personal best + most recent set for this exercise once
             var pb by remember { mutableStateOf<SetEntity?>(null) }
             var lastSet by remember { mutableStateOf<SetEntity?>(null) }
+            var prevSets by remember { mutableStateOf<List<SetEntity>>(emptyList()) }
             LaunchedEffect(exercise.id) {
                 pb = repo.bestSetForExercise(exercise.id)
                 lastSet = repo.lastSetForExercise(exercise.id)
+                prevSets = repo.lastSessionSets(exercise.id)
             }
 
             ExerciseLogCard(
@@ -127,6 +133,7 @@ fun LogWorkoutScreen(
                 logged     = logged,
                 personalBest = pb,
                 lastSet    = lastSet,
+                prevSets   = prevSets,
                 exerciseRepo = exerciseRepo,
                 onAdd      = { w, r ->
                     scope.launch {
@@ -212,6 +219,7 @@ private fun ExerciseLogCard(
     logged: List<SetEntity>,
     personalBest: SetEntity?,
     lastSet: SetEntity?,
+    prevSets: List<SetEntity> = emptyList(),
     exerciseRepo: ExerciseRepository,
     onAdd: (Double, Int) -> Unit,
     onDelete: (SetEntity) -> Unit
@@ -286,6 +294,30 @@ private fun ExerciseLogCard(
                 suggestion,
                 style = MaterialTheme.typography.labelMedium,
                 color = Gold,
+                modifier = Modifier.padding(top = 4.dp)
+            )
+        }
+
+        // Previous session, set by set — the set you're about to do glows gold.
+        if (prevSets.isNotEmpty()) {
+            val upcoming = logged.size
+            val line = buildAnnotatedString {
+                append("Last session:  ")
+                prevSets.forEachIndexed { i, p ->
+                    if (i > 0) append("  ·  ")
+                    val text = if (p.weightKg > 0.0)
+                        "${fmt(p.weightKg)}×${p.reps}" else "${p.reps} reps"
+                    if (i == upcoming) {
+                        withStyle(SpanStyle(color = Gold, fontWeight = FontWeight.SemiBold)) {
+                            append(text)
+                        }
+                    } else append(text)
+                }
+            }
+            Text(
+                line,
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.padding(top = 4.dp)
             )
         }

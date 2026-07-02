@@ -10,7 +10,6 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
-import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.scale
 import androidx.compose.ui.graphics.drawscope.translate
@@ -56,22 +55,81 @@ fun MuscleMapView(
         horizontalArrangement = Arrangement.spacedBy(8.dp),
         verticalAlignment = Alignment.Top
     ) {
+        val fillFor: (String) -> Color = { group ->
+            when (engagement[group] ?: Engagement.NONE) {
+                Engagement.PRIMARY   -> primaryColor
+                Engagement.SECONDARY -> secondaryColor
+                Engagement.NONE      -> restColor
+            }
+        }
         if (showFront) {
             MuscleFigure(
                 data, "front", data.frontMinX, data.frontMaxX,
-                engagement, primaryColor, secondaryColor, restColor, outlineColor,
-                Modifier.weight(1f)
+                fillFor, outlineColor, Modifier.weight(1f)
             )
         }
         if (showBack) {
             MuscleFigure(
                 data, "back", data.backMinX, data.backMaxX,
-                engagement, primaryColor, secondaryColor, restColor, outlineColor,
-                Modifier.weight(1f)
+                fillFor, outlineColor, Modifier.weight(1f)
             )
         }
     }
 }
+
+/**
+ * Whole-body recovery heat map. [recoveryBySvg] maps SVG data-group ->
+ * recovered fraction (0 = fully fatigued, 1 = fresh). Groups absent from the
+ * map render as rest (never trained recently = fresh).
+ *
+ * Colour ramp stays on brand: fresh muscles sit at the rest navy, working
+ * fatigue warms through gold, heavy fatigue glows ember red.
+ */
+@Composable
+fun RecoveryMapView(
+    recoveryBySvg: Map<String, Float>,
+    modifier: Modifier = Modifier
+) {
+    val context = LocalContext.current
+    val data = remember { loadMuscleData(context) }
+
+    val outlineColor = Color(0xFF16283A)
+    val fillFor: (String) -> Color = { group ->
+        recoveryColor(1f - (recoveryBySvg[group] ?: 1f))
+    }
+
+    Row(
+        modifier = modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        verticalAlignment = Alignment.Top
+    ) {
+        MuscleFigure(
+            data, "front", data.frontMinX, data.frontMaxX,
+            fillFor, outlineColor, Modifier.weight(1f)
+        )
+        MuscleFigure(
+            data, "back", data.backMinX, data.backMaxX,
+            fillFor, outlineColor, Modifier.weight(1f)
+        )
+    }
+}
+
+private val RestNavy  = Color(0xFF26405A)
+private val EmberRed  = Color(0xFFC24141)
+
+/** fatigue 0 -> rest navy, 0.5 -> gold, 1 -> ember red. */
+fun recoveryColor(fatigue: Float): Color {
+    val f = fatigue.coerceIn(0f, 1f)
+    return if (f <= 0.5f) lerpColor(RestNavy, Gold, f / 0.5f)
+    else lerpColor(Gold, EmberRed, (f - 0.5f) / 0.5f)
+}
+
+private fun lerpColor(a: Color, b: Color, t: Float): Color = Color(
+    red   = a.red   + (b.red   - a.red)   * t,
+    green = a.green + (b.green - a.green) * t,
+    blue  = a.blue  + (b.blue  - a.blue)  * t,
+    alpha = 1f
+)
 
 @Composable
 private fun MuscleFigure(
@@ -79,10 +137,7 @@ private fun MuscleFigure(
     view: String,
     minX: Float,
     maxX: Float,
-    engagement: Map<String, Engagement>,
-    primary: Color,
-    secondary: Color,
-    rest: Color,
+    fillFor: (String) -> Color,
     outline: Color,
     modifier: Modifier = Modifier
 ) {
@@ -102,13 +157,7 @@ private fun MuscleFigure(
             scale(s, s, pivot = Offset.Zero) {
                 for (mp in data.paths) {
                     if (mp.view != view) continue
-                    val eng = engagement[mp.group] ?: Engagement.NONE
-                    val fill = when (eng) {
-                        Engagement.PRIMARY   -> primary
-                        Engagement.SECONDARY -> secondary
-                        Engagement.NONE      -> rest
-                    }
-                    drawPath(mp.path, color = fill)
+                    drawPath(mp.path, color = fillFor(mp.group))
                     drawPath(mp.path, color = outline, style = Stroke(width = 1.2f / s))
                 }
             }

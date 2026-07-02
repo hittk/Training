@@ -142,6 +142,49 @@ class WorkoutRepository(
         }
     }
 
+    // ── Muscle recovery ───────────────────────────────────────────────────────
+
+    /**
+     * Emits per-muscle-group recovery (0 = fatigued, 1 = fresh) derived from
+     * the last 60 days of completed sets. The long window calibrates the
+     * model's reference volume; only the last 6 days contribute fatigue.
+     * Re-emits whenever sets change and on each collection (fresh `now`).
+     */
+    fun muscleRecovery(): Flow<List<com.kargathra.fitness.data.anatomy.GroupRecovery>> {
+        val from = System.currentTimeMillis() - LOOKBACK_MS
+        val library = SampleData.allRoutines
+            .flatMap { it.items.map { i -> i.exercise } }
+            .distinctBy { it.id }
+            .associateBy { it.id }
+
+        return dao.observeSetsFrom(from).map { sets ->
+            val resolved = HashMap<String, Exercise?>()
+            val loads = ArrayList<com.kargathra.fitness.data.anatomy.GroupLoad>(sets.size * 2)
+            sets.forEach { s ->
+                val ex = resolved.getOrPut(s.exerciseId) { resolveExercise(s.exerciseId, library) }
+                    ?: return@forEach
+                val vol = s.weightKg * s.reps
+                if (vol <= 0.0) return@forEach
+                loads += com.kargathra.fitness.data.anatomy.GroupLoad(
+                    sessionId = s.workoutId, group = ex.primary,
+                    volumeKg = vol, atMillis = s.performedAt
+                )
+                ex.secondary.forEach { mg ->
+                    loads += com.kargathra.fitness.data.anatomy.GroupLoad(
+                        sessionId = s.workoutId, group = mg,
+                        volumeKg = vol * 0.5, atMillis = s.performedAt
+                    )
+                }
+            }
+            com.kargathra.fitness.data.anatomy.RecoveryModel
+                .recovery(loads, System.currentTimeMillis())
+        }
+    }
+
+    /** Sets logged for this exercise in its most recent completed session. */
+    suspend fun lastSessionSets(exerciseId: String): List<SetEntity> =
+        dao.lastSessionSets(exerciseId)
+
     /** Build a one-off summary for a finished (or in-progress) workout. */
     suspend fun sessionSummary(workoutId: Long): SessionSummary? {
         val w = dao.getWorkout(workoutId) ?: return null
@@ -226,6 +269,9 @@ class WorkoutRepository(
     // ── Helpers ───────────────────────────────────────────────────────────────
 
     companion object {
+        /** Recovery-model calibration window: 60 days. */
+        const val LOOKBACK_MS: Long = 60L * 24 * 60 * 60 * 1000
+
         fun epley(weightKg: Double, reps: Int): Double =
             if (reps <= 1) weightKg else weightKg * (1.0 + reps / 30.0)
 

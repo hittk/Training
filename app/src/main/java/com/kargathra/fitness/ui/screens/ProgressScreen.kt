@@ -23,6 +23,7 @@ import com.kargathra.fitness.data.repo.TrendPoint
 import com.kargathra.fitness.data.repo.WorkoutRepository
 import com.kargathra.fitness.ui.components.KCard
 import com.kargathra.fitness.ui.components.MuscleVolumeChart
+import com.kargathra.fitness.ui.components.RecoveryCard
 import com.kargathra.fitness.ui.components.SectionLabel
 import com.kargathra.fitness.ui.components.TrendChart
 import java.time.Instant
@@ -37,6 +38,7 @@ fun ProgressScreen(
 ) {
     val exercises    by repo.observeLoggedExercises().collectAsStateWithLifecycle(emptyList())
     val weeklyVolume by repo.weeklyMuscleVolume().collectAsStateWithLifecycle(emptyList())
+    val recovery     by repo.muscleRecovery().collectAsStateWithLifecycle(emptyList())
     val workouts     by repo.observeWorkouts().collectAsStateWithLifecycle(emptyList())
     var selected     by remember { mutableStateOf<ExerciseRef?>(null) }
 
@@ -56,6 +58,11 @@ fun ProgressScreen(
         modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(20.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
+        // ── Muscle recovery ────────────────────────────────────────────────────
+        if (recovery.isNotEmpty()) {
+            RecoveryCard(recovery = recovery)
+        }
+
         // ── Weekly muscle volume ───────────────────────────────────────────────
         if (weeklyVolume.isNotEmpty()) {
             MuscleVolumeChart(volumes = weeklyVolume)
